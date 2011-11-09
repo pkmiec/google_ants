@@ -1,4 +1,5 @@
 import java.util.*;
+import java.io.IOException;
 
 /**
 * Starter bot implementation.
@@ -13,6 +14,9 @@ public class MyBot extends Bot {
   
   List<List<Aim>> doras = new ArrayList<List<Aim>>();
 
+  public static void main(String[] args) throws IOException {
+    new MyBot().readSystemInput();
+  }
   
   Map<Tile, List<Front>> allFronts = new HashMap<Tile, List<Front>>();
   
@@ -31,6 +35,7 @@ public class MyBot extends Bot {
   }
   
   public void afterUpdate() {
+    long t0 = System.currentTimeMillis();
     super.afterUpdate();
 
     orders.clear();
@@ -48,6 +53,7 @@ public class MyBot extends Bot {
     enemyHills.addAll(ants.getEnemyHills());
     waterTiles.addAll(ants.getWaterTiles());
     updateFronts();
+    // System.err.println("afterUpdate: " + (System.currentTimeMillis() - t0));
   }
   
   private boolean doMoveLocation(Tile antLoc, Tile destLoc) {
@@ -130,6 +136,8 @@ public class MyBot extends Bot {
   public void createFoodAnts() {
     List<Route> newFoodRoutes = new ArrayList<Route>();
     for (Tile foodLoc : ants.getFoodTiles()) {
+      if (foodRoutes.containsKey(foodLoc)) { continue; }
+      
       for (Tile antLoc : ants.getMyAnts()) {
         if (orders.containsValue(antLoc)) { continue; }
         
@@ -270,12 +278,29 @@ public class MyBot extends Bot {
   }
 
   public void doTurn() {
+    long t0 = System.currentTimeMillis();
     createAttackAnts();
+    // System.err.println("createAttackAnts: " + (System.currentTimeMillis() - t0));
+    
+    t0 = System.currentTimeMillis();
     moveFoodAnts();
+    // System.err.println("moveFoodAnts: " + (System.currentTimeMillis() - t0));
+    
+    t0 = System.currentTimeMillis();
     moveAttackAnts();
+    // System.err.println("moveAttackAnts: " + (System.currentTimeMillis() - t0));
+    
+    t0 = System.currentTimeMillis();
     createFoodAnts();
+    // System.err.println("createFoodAnts: " + (System.currentTimeMillis() - t0));
+    
+    t0 = System.currentTimeMillis();
     createDoraAnts();
+    // System.err.println("createDoraAnts: " + (System.currentTimeMillis() - t0));
+    
+    t0 = System.currentTimeMillis();
     moveDoraAnts();
+    // System.err.println("moveDoraAnts: " + (System.currentTimeMillis() - t0));
 
     // // attack hills
     // List<Route> hillRoutes = new ArrayList<Route>();

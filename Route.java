@@ -39,7 +39,7 @@ public class Route implements Comparable<Route> {
   }
 
   public Object clone() {
-    return new Route(start, end, new ArrayList<Aim>(this.directions));
+    return new Route(start, end, new ArrayList<Aim> (this.directions));
   }
 
   @Override

@@ -1,15 +1,10 @@
-import java.io.IOException;
 
 /**
  * Provides basic game state handling.
  */
 public abstract class Bot extends AbstractSystemInputParser {
     protected Ants ants;
-    
-    public static void main(String[] args) throws IOException {
-      new MyBot().readSystemInput();
-    }
-    
+        
     /**
      * {@inheritDoc}
      */
