@@ -24,7 +24,7 @@ public class Ants {
 
     private final int spawnRadius2;
 
-    private final boolean visible[][];
+     final boolean visible[][];
 
     private final Set<Tile> visionOffsets;
 
@@ -330,6 +330,14 @@ public class Ants {
      * 
      * @return distance between <code>t1</code> and <code>t2</code>
      */
+    public int getManhattanDistance(Tile t1, Tile t2) {
+        int rowDelta = Math.abs(t1.getRow() - t2.getRow());
+        int colDelta = Math.abs(t1.getCol() - t2.getCol());
+        rowDelta = Math.min(rowDelta, rows - rowDelta);
+        colDelta = Math.min(colDelta, cols - colDelta);
+        return rowDelta + colDelta;
+    }
+
     public int getDistance(Tile t1, Tile t2) {
         int rowDelta = Math.abs(t1.getRow() - t2.getRow());
         int colDelta = Math.abs(t1.getCol() - t2.getCol());
@@ -337,7 +345,7 @@ public class Ants {
         colDelta = Math.min(colDelta, cols - colDelta);
         return rowDelta * rowDelta + colDelta * colDelta;
     }
-
+    
     /**
      * Returns one or two orthogonal directions from one location to the another.
      * 
@@ -461,10 +469,13 @@ public class Ants {
      */
     public void setVision() {
         for (Tile antLoc : myAnts) {
+          // System.err.print("vision: " + antLoc);
             for (Tile locOffset : visionOffsets) {
                 Tile newLoc = getTile(antLoc, locOffset);
+                // System.err.print(" " + newLoc);
                 visible[newLoc.getRow()][newLoc.getCol()] = true;
             }
+          // System.err.println();
         }
     }
 
