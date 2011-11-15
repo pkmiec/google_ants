@@ -13,12 +13,9 @@ public enum Ilk {
     
     /** Dead ant tile. */
     DEAD,
-    
-    /** My ant tile. */
-    MY_ANT,
-    
-    /** Enemy ant tile. */
-    ENEMY_ANT;
+
+    /** Ant. */
+    ANT;
     
     /**
      * Checks if this type of tile is passable, which means it is not a water tile.

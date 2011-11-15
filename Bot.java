@@ -36,16 +36,13 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void beforeUpdate() {
-        ants.setTurnStartTime(System.currentTimeMillis());
-        ants.clearMyAnts();
-        ants.clearEnemyAnts();
-        ants.clearMyHills();
-        ants.clearEnemyHills();
-        ants.clearFood();
-        ants.clearWater();
-        ants.clearDeadAnts();
-        ants.getOrders().clear();
-        ants.clearVision();
+      ants.setTurnStartTime(System.currentTimeMillis());
+      ants.clearAnts();
+      ants.clearHills();
+      ants.clearFood();
+      ants.clearWater();
+      ants.getOrders().clear();
+      ants.clearVision();
     }
     
     /**
@@ -53,7 +50,7 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void addWater(int row, int col) {
-        ants.update(Ilk.WATER, new Tile(row, col));
+      ants.updateWater(new Tile(row, col));
     }
     
     /**
@@ -61,7 +58,7 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void addAnt(int row, int col, int owner) {
-        ants.update(owner > 0 ? Ilk.ENEMY_ANT : Ilk.MY_ANT, new Tile(row, col));
+      ants.updateAnts(owner, new Tile(row, col));
     }
     
     /**
@@ -69,7 +66,7 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void addFood(int row, int col) {
-        ants.update(Ilk.FOOD, new Tile(row, col));
+      ants.updateFood(new Tile(row, col));
     }
     
     /**
@@ -77,7 +74,6 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void removeAnt(int row, int col, int owner) {
-        ants.update(Ilk.DEAD, new Tile(row, col));
     }
     
     /**
@@ -85,7 +81,7 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void addHill(int row, int col, int owner) {
-        ants.updateHills(owner, new Tile(row, col));
+      ants.updateHills(owner, new Tile(row, col));
     }
     
     /**
@@ -93,6 +89,6 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void afterUpdate() {
-        ants.setVision();
+      ants.setVision();
     }
 }
