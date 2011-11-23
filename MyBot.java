@@ -6,8 +6,6 @@ import java.io.IOException;
 */
 public class MyBot extends Bot {
   Random random;
-  double defenseRadius2    = 2.0;
-  Set<Tile> defenseOffsets = new HashSet<Tile>();
 
   Map<Tile, Tile> orders = new HashMap<Tile, Tile>();
   Set<Tile> enemyHills  = new HashSet<Tile>();
@@ -17,7 +15,6 @@ public class MyBot extends Bot {
   Map<Tile, Set<Tile>> combatAnts = null;
 
   enum Agent {
-    ENEMY_ANTS(100),
     EXPLORE(100);
     
     private final double value;
@@ -105,11 +102,6 @@ public class MyBot extends Bot {
       }
       
       switch (agent) {
-        case ENEMY_ANTS:
-          if (ants.getEnemyAnts().contains(this)) {
-            values[agent.ordinal()] = agent.getValue();
-          }
-          break;
         case EXPLORE:
           if (ants.getMyAnts().contains(this)) {
             if (!combatAnts.containsKey(this)) {
@@ -279,20 +271,6 @@ public class MyBot extends Bot {
     
     random = new Random(1);
     squares = new Squares(rows, cols);
-    
-    int mx = (int) Math.sqrt(defenseRadius2);
-    for (int row = -mx; row <= mx; ++row) {
-      for (int col = -mx; col <= mx; ++col) {
-        int d = row * row + col * col;
-        if (d <= defenseRadius2) {
-          defenseOffsets.add(new Tile(row, col));
-        }
-      }
-    }
-    
-    // System.err.println("viewRadius: " + viewRadius2);
-    // System.err.println("attackRadius: " + attackRadius2);
-    // System.err.println("spawnRadius: " + spawnRadius2);
   }
   
   public void afterUpdate() {
@@ -332,7 +310,7 @@ public class MyBot extends Bot {
       
       for (Tile offset : ants.getVisionOffsets()) {
         Tile loc = ants.getTile(antLoc, offset);
-        if (ants.getEnemyHills().contains(loc)) {
+        if (ants.getEnemyAnts().contains(loc)) {
           enemySet.add(loc);
         }
       }
@@ -344,47 +322,6 @@ public class MyBot extends Bot {
     System.err.println("combatAnts: " + (System.currentTimeMillis() - t0));
   }
   
-  // public void updateWater() {
-  //   PriorityQueue<Tile> newWater = new PriorityQueue<Tile>();
-  // 
-  //   for (Tile waterTile: ants.getWaterTiles()) {
-  //     if (!waterTiles.contains(waterTile)) {
-  //       waterTiles.add(waterTile);
-  //       newWater.offer(waterTile);
-  //     }
-  //   }
-  //   
-  //   Tile waterTile = null;
-  //   while ((waterTile = newWater.poll()) != null) {
-  //     for (Aim direction : Aim.values()) {
-  //       Tile pseudoWater = ants.getTile(waterTile, direction);
-  //       if (waterTiles.contains(pseudoWater)) { continue; }
-  //       
-  //       int waterSides = 0;
-  //       for (Aim direction2 : Aim.values()) {
-  //         Tile adjLoc = ants.getTile(pseudoWater, direction2);
-  //         if (waterTiles.contains(adjLoc)) { waterSides = waterSides + 1; }
-  //       }
-  //       if (waterSides >= 3) {
-  //         waterTiles.add(pseudoWater);
-  //         newWater.offer(pseudoWater);
-  //       }
-  //     }
-  //   }
-  // }
-  
-  // private boolean doMoveLocation(Tile antLoc, Tile destLoc) {
-  //   Ants ants = getAnts();
-  //   // Track targets to prevent 2 ants to the same location
-  //   List<Aim> directions = new Router(antLoc, destLoc).directions();
-  //   if (directions != null) {
-  //     // System.err.println("direction: " + antLoc + " -> " + destLoc);
-  //     // System.err.println(Arrays.toString(directions.toArray()));
-  //     return doMoveDirection(antLoc, directions.get(0)); 
-  //   }
-  //   return false;
-  // }
-
   private boolean moveDirection(Tile antLoc, Aim direction) {
     return moveDirection(antLoc, direction, orders);
   }
@@ -410,15 +347,14 @@ public class MyBot extends Bot {
     }
   }
 
-  public void moveAntsOnTargets(Set<Tile> targets, int maxAnts, int maxDistance) {
+  public void moveAntsOnTargets(Set<Tile> targets, int maxAnts, int maxDistance, Map<Tile,Tile> tmpOrders) {
     PriorityQueue<Route> possibleRoutes = new PriorityQueue<Route>();
     Map<Tile,Set<Route>> antsOnTarget = new HashMap<Tile,Set<Route>>();
     Route route = null;
-    Set<Tile> tmpOrders = new HashSet<Tile>();
 
     for (Tile foodLoc : targets) {
       for (Tile antLoc : ants.getMyAnts()) {
-        if (orders.containsValue(antLoc)) { continue; }
+        if (tmpOrders.containsValue(antLoc)) { continue; }
 
         List<Aim> directions = new Router(antLoc, foodLoc).directions(maxDistance);
         if (directions != null) {
@@ -430,86 +366,30 @@ public class MyBot extends Bot {
     
     while ((route = possibleRoutes.poll()) != null) {
       if (maxAnts > 0 && antsOnTarget.containsKey(route.getEnd()) && antsOnTarget.get(route.getEnd()).size() >= maxAnts) { continue; }
-      if (orders.containsValue(route.getStart())) { continue; }
-      if (tmpOrders.contains(route.getStart())) { continue; }
-      
-      tmpOrders.add(route.getStart());
-      Set<Route> routes = antsOnTarget.get(route.getEnd());
-      if (routes == null) {
-        routes = new HashSet<Route>();
-        antsOnTarget.put(route.getEnd(), routes);
-      }
-      routes.add(route);
-    }
+      if (tmpOrders.containsValue(route.getStart())) { continue; }
 
-    for (Iterator<Map.Entry<Tile,Set<Route>>> it = antsOnTarget.entrySet().iterator(); it.hasNext(); ) {
-      Map.Entry<Tile,Set<Route>> entry = it.next();
-      Tile target          = entry.getKey();
-      Set<Route> antRoutes = entry.getValue();
-      
-      for (Route antRoute : antRoutes) {
-        if (antRoute.getDirections().size() == 1) {
-          orders.put(antRoute.getStart(), antRoute.getStart());
-        } else {
-          moveDirection(antRoute.getStart(), antRoute.getDirections().get(0));
-        }
+      if (route.getDirections().size() == 1) {
+        moveDirection(route.getStart(), null, tmpOrders);
+      } else {
+        moveDirection(route.getStart(), route.getDirections().get(0), tmpOrders);
       }
     }
   }
 
-  public void moveFoodAnts() {
-    moveAntsOnTargets(ants.getFoodTiles(), 1, 10);
+  public void moveFoodAnts(Map<Tile,Tile> tmpOrders) {
+    moveAntsOnTargets(ants.getFoodTiles(), 1, 10, tmpOrders);
   }
 
-  // public void moveSwarmAnts() {
-  //   
-  //   
-  //   
-  //   for (Tile antLoc : ants.getMyAnts()) {
-  //     if (orders.containsValue(antLoc)) { continue; }
-  //     
-  //     if (squares.getValue(Agent.ENEMY_ANTS, antLoc) > 0.2) {
-  //       List<AimValue> directions = squares.getDirections(Agent.ENEMY_ANTS, antLoc);
-  // 
-  //       Tile loc = antLoc;
-  // 
-  //       List<AimValue> path = new ArrayList<AimValue>();
-  //       path.add(directions.get(0));
-  //       while (path.get(path.size() - 1).value < Agent.ENEMY_ANTS.getValue()) {
-  //         AimValue direction = squares.getDirections(Agent.ENEMY_ANTS, loc).get(0);
-  //         if (direction.aim != null) {
-  //           loc = ants.getTile(loc, direction.aim);
-  //           if (ants.getDistance(antLoc, loc) > ants.getViewRadius2()) {
-  //             return;
-  //           }
-  //         } else {
-  //           return;
-  //         }
-  //         path.add(direction);
-  //       }
-  //       
-  //       // System.err.println(antLoc + " " + squares.getValue(Agent.ENEMY_ANTS, antLoc) + " path " + path + " " + squares.getValue(Agent.MY_ANTS, loc));
-  //       if (25 >= ants.getDistance(antLoc, loc) && squares.getValue(Agent.MY_ANTS, loc) < squares.getValue(Agent.ENEMY_ANTS, antLoc) * 1.6) {
-  //         directions = squares.getDirections(Agent.MY_HILLS, antLoc);
-  //       }
-  //       for (AimValue direction : directions) {
-  //         if (moveDirection(antLoc, direction.aim)) {
-  //           // System.err.println(" -> " + direction.aim);
-  //           break;
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
-
-  public void moveExploreAnts() {
+  public void moveAnts() {
     Map<Tile,Tile> tmpOrders = new HashMap<Tile,Tile>(orders);
 
+    moveFoodAnts(tmpOrders);
+    
     // Try to move ants towards highest explore goals.
     for (Tile antLoc : ants.getMyAnts()) {
       if (tmpOrders.containsValue(antLoc)) { continue; }
       
-      List<AimValue> directions = squares.getProbabilisticDirections(Agent.EXPLORE, antLoc, -1);
+      List<AimValue> directions = squares.getDirections(Agent.EXPLORE, antLoc, -1);
       System.err.println(antLoc + " " + directions);
       for (AimValue direction : directions) {
         if (moveDirection(antLoc, direction.aim, tmpOrders)) {
@@ -577,68 +457,6 @@ public class MyBot extends Bot {
     orders = tmpOrders;
   }
 
-  public void moveDefenseAnts() {
-    Set<Tile> defenseTiles  = new HashSet<Tile>();
-    for (Tile myHill : ants.getMyHills()) {
-      if (!combatAnts.containsKey(myHill)) { continue; }
-      
-      for (Tile offset : defenseOffsets) {
-        Tile loc = ants.getTile(myHill, offset);
-        if (!waterTiles.contains(loc)) {
-          defenseTiles.add(loc);
-        }
-      }
-    }
-    // System.err.println("defenseTiles: " + defenseTiles);
-    
-    List<Tile> vipAnts = new ArrayList<Tile>(ants.getMyHills());
-    while (!vipAnts.isEmpty()) {
-      Tile antLoc = vipAnts.remove(0);
-
-      if (!ants.getMyAnts().contains(antLoc)) { continue; }
-      if (orders.containsValue(antLoc)) { continue; }
-
-      if (defenseTiles.contains(antLoc)) {
-        List<Aim> directions = Arrays.asList(Aim.values());
-        Collections.shuffle(directions);
-        for (Aim aim : directions) {
-          Tile aimLoc = ants.getTile(antLoc, aim);
-          if (defenseTiles.contains(aimLoc)) {
-            if (moveDirection(antLoc, aim)) {
-              vipAnts.add(ants.getTile(antLoc, aim));
-              break;
-            }
-          }
-        }
-        if (orders.containsValue(antLoc)) { continue; }
-
-        for (Aim aim : directions) {
-          Tile aimLoc = ants.getTile(antLoc, aim);
-          if (!ants.getMyHills().contains(aimLoc) && moveDirection(antLoc, aim)) {
-            vipAnts.add(ants.getTile(antLoc, aim));
-            break;
-          }
-        }
-        if (orders.containsValue(antLoc)) { continue; }
-      } else {
-        for (AimValue direction : squares.getDirections(Agent.EXPLORE, antLoc, -1)) {
-          if (direction != null && moveDirection(antLoc, direction.aim)) {
-            // System.err.println(" -> " + aim);
-            break;
-          }
-          // System.err.println("");
-        }
-      }
-    }
-    
-    for (Tile antLoc : defenseTiles) {
-      if (!ants.getMyAnts().contains(antLoc)) { continue; }
-      if (orders.containsValue(antLoc)) { continue; }
-      
-      moveDirection(antLoc, null);
-    }
-  }
-
   public void issueOrders() {
     for (Map.Entry<Tile,Tile> order : orders.entrySet()) {
       Tile newLoc = order.getKey();
@@ -655,30 +473,16 @@ public class MyBot extends Bot {
     long t0 = System.currentTimeMillis();
     for (int i = 0; i < 10; i++) {
       squares.diffuse(Agent.EXPLORE);
-      squares.diffuse(Agent.ENEMY_ANTS);
     }
     System.err.println("diffusion: " + (System.currentTimeMillis() - t0));
     // squares.print(Agent.EXPLORE);
     
     t0 = System.currentTimeMillis();
-    moveDefenseAnts();
-    System.err.println("moveDefenseAnts: " + (System.currentTimeMillis() - t0));
-
-    // t0 = System.currentTimeMillis();
-    // moveSwarmAnts();
-    // System.err.println("moveSwarmAnts: " + (System.currentTimeMillis() - t0));
-    
-    t0 = System.currentTimeMillis();
-    moveFoodAnts();
-    System.err.println("moveFoodAnts: " + (System.currentTimeMillis() - t0));
-    
-    t0 = System.currentTimeMillis();
-    moveExploreAnts();
-    System.err.println("createExploreAnts: " + (System.currentTimeMillis() - t0));
+    moveAnts();
+    System.err.println("moveAnts: " + (System.currentTimeMillis() - t0));
     
     t0 = System.currentTimeMillis();
     issueOrders();
-    
     
     System.err.println("-------------" + ants.getTimeRemaining());
     turn++;
