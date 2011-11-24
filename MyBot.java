@@ -319,7 +319,7 @@ public class MyBot extends Bot {
         combatAnts.put(antLoc, enemySet);
       }
     }
-    System.err.println("combatAnts: " + (System.currentTimeMillis() - t0));
+    // System.err.println("combatAnts: " + (System.currentTimeMillis() - t0));
   }
   
   private boolean moveDirection(Tile antLoc, Aim direction) {
@@ -390,17 +390,17 @@ public class MyBot extends Bot {
       if (tmpOrders.containsValue(antLoc)) { continue; }
       
       List<AimValue> directions = squares.getDirections(Agent.EXPLORE, antLoc, -1);
-      System.err.println(antLoc + " " + directions);
+      // System.err.println(antLoc + " " + directions);
       for (AimValue direction : directions) {
         if (moveDirection(antLoc, direction.aim, tmpOrders)) {
-          System.err.println(" -> " + direction.aim);
+          // System.err.println(" -> " + direction.aim);
           break;
         }
       }
       if (!tmpOrders.containsValue(antLoc)) {
-        System.err.println(antLoc + " fucked");
+        // System.err.println(antLoc + " fucked");
         while (tmpOrders.containsKey(antLoc)) {
-          System.err.println("undo " + antLoc);
+          // System.err.println("undo " + antLoc);
           antLoc = tmpOrders.put(antLoc, antLoc);
         }
       }
@@ -425,7 +425,7 @@ public class MyBot extends Bot {
         if (combatValues.willDie(newLoc, 0)) {
           noTmpOrdersRemoved = false;
           it.remove();
-          System.err.println(oldLoc + " ->  " + newLoc + " will die");
+          // System.err.println(oldLoc + " ->  " + newLoc + " will die");
           break;
         }
       }
@@ -438,17 +438,17 @@ public class MyBot extends Bot {
       if (tmpOrders.containsValue(antLoc)) { continue; }
       
       List<AimValue> directions = squares.getDirections(Agent.EXPLORE, antLoc, 1);
-      System.err.println(antLoc + " " + directions);
+      // System.err.println(antLoc + " " + directions);
       for (AimValue direction : directions) {
         if (moveDirection(antLoc, direction.aim, tmpOrders)) {
-          System.err.println(" -> " + direction.aim);
+          // System.err.println(" -> " + direction.aim);
           break;
         }
       }
       if (!tmpOrders.containsValue(antLoc)) {
-        System.err.println(antLoc + " fucked 2");
+        // System.err.println(antLoc + " fucked 2");
         while (tmpOrders.containsKey(antLoc)) {
-          System.err.println("undo " + antLoc);
+          // System.err.println("undo " + antLoc);
           antLoc = tmpOrders.put(antLoc, antLoc);
         }
       }
@@ -474,17 +474,17 @@ public class MyBot extends Bot {
     for (int i = 0; i < 10; i++) {
       squares.diffuse(Agent.EXPLORE);
     }
-    System.err.println("diffusion: " + (System.currentTimeMillis() - t0));
+    // System.err.println("diffusion: " + (System.currentTimeMillis() - t0));
     // squares.print(Agent.EXPLORE);
     
     t0 = System.currentTimeMillis();
     moveAnts();
-    System.err.println("moveAnts: " + (System.currentTimeMillis() - t0));
+    // System.err.println("moveAnts: " + (System.currentTimeMillis() - t0));
     
     t0 = System.currentTimeMillis();
     issueOrders();
     
-    System.err.println("-------------" + ants.getTimeRemaining());
+    // System.err.println("-------------" + ants.getTimeRemaining());
     turn++;
   }
   
