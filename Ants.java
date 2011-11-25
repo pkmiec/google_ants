@@ -93,7 +93,7 @@ public class Ants {
             }
           }
         }
-        System.err.println("attack: " + attackOffsets);
+        // System.err.println("attack: " + attackOffsets);
         
         double aggressionRadius2 = Math.pow((Math.sqrt(attackRadius2) + 1), 2);
         aggressionOffsets = new HashSet<Tile>();
@@ -106,7 +106,7 @@ public class Ants {
             }
           }
         }
-        System.err.println("aggression: " + aggressionOffsets);
+        // System.err.println("aggression: " + aggressionOffsets);
     }
 
     /**

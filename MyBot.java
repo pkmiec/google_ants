@@ -1,10 +1,31 @@
 import java.util.*;
 import java.io.IOException;
+import java.util.logging.Level;
 
 /**
 * Starter bot implementation.
 */
 public class MyBot extends Bot {
+  public static Level logLevel = Level.OFF;
+  
+  public void logFine(String str) {
+    if (logLevel.intValue() <= Level.FINE.intValue()) {
+      System.err.println("FINE: " + str);
+    } 
+  }
+
+  public void logFiner(String str) {
+    if (logLevel.intValue() <= Level.FINER.intValue()) {
+      System.err.println("FINER: " + str);
+    } 
+  }
+
+  public void logFinest(String str) {
+    if (logLevel.intValue() <= Level.FINEST.intValue()) {
+      System.err.println("FINEST: " + str);
+    } 
+  }
+  
   Random random;
 
   Map<Tile, Tile> orders = new HashMap<Tile, Tile>();
@@ -46,7 +67,7 @@ public class MyBot extends Bot {
       }
       
       int tileAttackers = 0;
-      for (Tile offset : ants.getAggressionOffsets()) {
+      for (Tile offset : ants.getAttackOffsets()) {
         Tile loc = ants.getTile(tile, offset);
         Integer locOwner = antsOwners.get(loc);
       
@@ -70,7 +91,7 @@ public class MyBot extends Bot {
     
         if (locOwner != null && locOwner != owner) {
           int locAttackers = getTileAttackers(loc, locOwner); // ants attacking them
-          // System.err.println("attacking difference: " + myAttackers + " " + locAttackers);
+          logFinest("attacking difference: " + myAttackers + " " + locAttackers);
           if (myAttackers >= locAttackers) {
             return true;
           }
@@ -164,7 +185,6 @@ public class MyBot extends Bot {
     }
 
     public void diffuse(Agent agent) {
-      long t0 = System.currentTimeMillis();
       for (int r = 0; r < rows ; r++) {
         for (int c = 0; c < cols; c++) {
           double sum = 0.0;
@@ -191,7 +211,6 @@ public class MyBot extends Bot {
           squares[r][c].setValue(agent, sum);
         }
       }
-      // System.err.println("diffusion time: " + (System.currentTimeMillis() - t0));
     }
     
     public void print(Agent agent) {
@@ -263,12 +282,20 @@ public class MyBot extends Bot {
   int turn = 0;
 
   public static void main(String[] args) throws IOException {
+    if (System.getProperty("logLevel") != null) {
+      try {
+        logLevel = Level.parse(System.getProperty("logLevel"));
+      } catch (IllegalArgumentException e) {  
+      } catch (NullPointerException e) {
+      }
+    }
+    
     new MyBot().readSystemInput();
   }
   
   public void setup(int loadTime, int turnTime, int rows, int cols, int turns, int viewRadius2, int attackRadius2, int spawnRadius2) {
     super.setup(loadTime, turnTime, rows, cols, turns, viewRadius2, attackRadius2, spawnRadius2);
-    
+
     random = new Random(1);
     squares = new Squares(rows, cols);
   }
@@ -298,7 +325,6 @@ public class MyBot extends Bot {
     waterTiles.addAll(ants.getWaterTiles());
     enemyHills.addAll(ants.getEnemyHills());
     
-    t0 = System.currentTimeMillis();
     combatAnts = new HashMap<Tile, Set<Tile>>();
     
     Set<Tile> locs = new HashSet<Tile>();
@@ -319,7 +345,7 @@ public class MyBot extends Bot {
         combatAnts.put(antLoc, enemySet);
       }
     }
-    // System.err.println("combatAnts: " + (System.currentTimeMillis() - t0));
+    logFine("afterUpdate: " + (System.currentTimeMillis() - t0));
   }
   
   private boolean moveDirection(Tile antLoc, Aim direction) {
@@ -368,10 +394,9 @@ public class MyBot extends Bot {
       if (maxAnts > 0 && antsOnTarget.containsKey(route.getEnd()) && antsOnTarget.get(route.getEnd()).size() >= maxAnts) { continue; }
       if (tmpOrders.containsValue(route.getStart())) { continue; }
 
-      if (route.getDirections().size() == 1) {
-        moveDirection(route.getStart(), null, tmpOrders);
-      } else {
-        moveDirection(route.getStart(), route.getDirections().get(0), tmpOrders);
+      Aim aim = route.getDirections().size() == 1 ? null : route.getDirections().get(0);
+      if (moveDirection(route.getStart(), aim, tmpOrders)) {
+        logFiner(route.getStart() + " -> " + route.getEnd() + " FOOD " + aim);
       }
     }
   }
@@ -382,6 +407,7 @@ public class MyBot extends Bot {
 
   public void moveAnts() {
     Map<Tile,Tile> tmpOrders = new HashMap<Tile,Tile>(orders);
+    Map<Tile, List<AimValue>> antsDirections = new HashMap<Tile, List<AimValue>>();
 
     moveFoodAnts(tmpOrders);
     
@@ -390,17 +416,21 @@ public class MyBot extends Bot {
       if (tmpOrders.containsValue(antLoc)) { continue; }
       
       List<AimValue> directions = squares.getDirections(Agent.EXPLORE, antLoc, -1);
-      // System.err.println(antLoc + " " + directions);
-      for (AimValue direction : directions) {
-        if (moveDirection(antLoc, direction.aim, tmpOrders)) {
-          // System.err.println(" -> " + direction.aim);
+      antsDirections.put(antLoc, directions);
+      
+      logFiner(antLoc + " " + directions);
+      for (Iterator<AimValue> it = directions.iterator(); it.hasNext(); ) {
+        AimValue aimValue = it.next();
+        it.remove();
+        
+        if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+          logFiner(" -> " + aimValue.aim);
           break;
         }
       }
+
       if (!tmpOrders.containsValue(antLoc)) {
-        // System.err.println(antLoc + " fucked");
         while (tmpOrders.containsKey(antLoc)) {
-          // System.err.println("undo " + antLoc);
           antLoc = tmpOrders.put(antLoc, antLoc);
         }
       }
@@ -408,7 +438,7 @@ public class MyBot extends Bot {
 
     // Prevent ants from dying.
     while (tmpOrders.size() > 0) {
-      boolean noTmpOrdersRemoved = true;
+      Tile antLoc = null;
 
       Map<Tile,Integer> tmpAnts = new HashMap<Tile,Integer>(ants.getAnts());
       for (Map.Entry<Tile,Tile> entry: tmpOrders.entrySet()) {
@@ -422,33 +452,36 @@ public class MyBot extends Bot {
         Tile oldLoc = tmpOrder.getValue();
 
         if (orders.containsValue(oldLoc)) { continue; } // skip real orders
+        
         if (combatValues.willDie(newLoc, 0)) {
-          noTmpOrdersRemoved = false;
+          antLoc = oldLoc;
           it.remove();
-          // System.err.println(oldLoc + " ->  " + newLoc + " will die");
+          logFiner(oldLoc + " ->  " + newLoc + " will die");
           break;
         }
       }
+
+      if (antLoc == null) { break; }
+
+      List<AimValue> directions = antsDirections.get(antLoc);
+      if (directions == null) {
+        directions = squares.getDirections(Agent.EXPLORE, antLoc, -1);
+        antsDirections.put(antLoc, directions);
+      }
+      logFiner(antLoc + " " + directions);
       
-      if (noTmpOrdersRemoved) { break; }
-    }
-    
-    // Try to move ants away towards lowest goals.
-    for (Tile antLoc : ants.getMyAnts()) {
-      if (tmpOrders.containsValue(antLoc)) { continue; }
-      
-      List<AimValue> directions = squares.getDirections(Agent.EXPLORE, antLoc, 1);
-      // System.err.println(antLoc + " " + directions);
-      for (AimValue direction : directions) {
-        if (moveDirection(antLoc, direction.aim, tmpOrders)) {
-          // System.err.println(" -> " + direction.aim);
+      for (Iterator<AimValue> it =  directions.iterator(); it.hasNext(); ) {
+        AimValue aimValue = it.next();
+        it.remove();
+
+        if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+          logFiner(" -> " + aimValue.aim);
           break;
         }
       }
+
       if (!tmpOrders.containsValue(antLoc)) {
-        // System.err.println(antLoc + " fucked 2");
         while (tmpOrders.containsKey(antLoc)) {
-          // System.err.println("undo " + antLoc);
           antLoc = tmpOrders.put(antLoc, antLoc);
         }
       }
@@ -470,21 +503,25 @@ public class MyBot extends Bot {
   }
 
   public void doTurn() {
-    long t0 = System.currentTimeMillis();
-    for (int i = 0; i < 10; i++) {
+    long t0;
+    
+    t0 = System.currentTimeMillis();
+    for (int i = 0; i < Math.min(turn, 10); i++) {
       squares.diffuse(Agent.EXPLORE);
     }
-    // System.err.println("diffusion: " + (System.currentTimeMillis() - t0));
+    logFine("diffusion: " + (System.currentTimeMillis() - t0));
+
     // squares.print(Agent.EXPLORE);
     
     t0 = System.currentTimeMillis();
     moveAnts();
-    // System.err.println("moveAnts: " + (System.currentTimeMillis() - t0));
+    logFine("moveAnts: " + (System.currentTimeMillis() - t0));
     
     t0 = System.currentTimeMillis();
     issueOrders();
+    logFine("issueOrders: " + (System.currentTimeMillis() - t0));
     
-    // System.err.println("-------------" + ants.getTimeRemaining());
+    logFine("----- done ----- " + ants.getTimeRemaining());
     turn++;
   }
   
