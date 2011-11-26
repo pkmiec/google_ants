@@ -232,6 +232,20 @@ public class MyBot extends Bot {
       System.err.println();
     }
     
+    public void printRaw(Agent agent) {
+      for (int r = 0; r < rows ; r++) {
+        for (int c = 0; c < cols; c++) {
+          if (waterTiles.contains(squares[r][c])) {
+            System.err.print("    ");
+          } else {
+            double value = squares[r][c].getValue(agent);
+            System.err.print(String.format("%4.0f", value));
+          }
+        }
+        System.err.println();
+      }
+      System.err.println();
+    }
     public List<AimValue> getDirections(final Agent agent, final Tile tile, final int ascending) {
       final ArrayList<AimValue> values = new ArrayList<AimValue>();
       final int r = tile.getRow();
@@ -511,7 +525,7 @@ public class MyBot extends Bot {
     }
     logFine("diffusion: " + (System.currentTimeMillis() - t0));
 
-    // squares.print(Agent.EXPLORE);
+    squares.printRaw(Agent.EXPLORE);
     
     t0 = System.currentTimeMillis();
     moveAnts();
