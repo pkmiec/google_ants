@@ -31,6 +31,8 @@ public class Ants {
 
     private long turnStartTime;
 
+    private final Set<Tile> myDeadAnts = new HashSet<Tile>();
+
     private final Set<Tile> myAnts = new TreeSet<Tile>();
     private final Set<Tile> enemyAnts = new TreeSet<Tile>();
     private final Map<Tile, Integer> ants = new HashMap<Tile,Integer>();
@@ -273,6 +275,10 @@ public class Ants {
       return ants;
     }
 
+    public Set<Tile> getMyDeadAnts() { 
+      return myDeadAnts;
+    }
+
     /**
      * Returns a set containing all my hills locations.
      * 
@@ -420,6 +426,12 @@ public class Ants {
 
     public void updateFood(Tile tile) {
       foodTiles.add(tile);
+    }
+
+    public void updateDeadAnts(int owner, Tile tile) {
+      if (owner == 0) {
+        myDeadAnts.add(tile);
+      }
     }
 
     public void updateAnts(int owner, Tile tile) {

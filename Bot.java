@@ -74,6 +74,7 @@ public abstract class Bot extends AbstractSystemInputParser {
      */
     @Override
     public void removeAnt(int row, int col, int owner) {
+      ants.updateDeadAnts(owner, new Tile(row, col));
     }
     
     /**
