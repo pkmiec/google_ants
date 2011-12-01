@@ -233,7 +233,7 @@ public class MyBot extends Bot {
             if (seenOnTurn == -1) {
               setInitValue(agent, 80);
             } else {
-              setInitValue(agent, Math.min(80, 40 + (turn - seenOnTurn) * 2));
+              setInitValue(agent, Math.min(80, 40 + ((turn - seenOnTurn) * 2)));
             }
           } else {
             if (ants.getEnemyAnts().contains(this)) {
@@ -345,7 +345,7 @@ public class MyBot extends Bot {
         Agent agent    = entry.getKey();
         Integer factor = entry.getValue();
 
-        sum += (values[agent.ordinal()] / 100.0 * factor);
+        sum += (values[agent.ordinal()] * factor / 100.0);
       }
       return sum;
     }
@@ -820,7 +820,11 @@ public class MyBot extends Bot {
     }
     logFine("diffusion: " + (System.currentTimeMillis() - t0));
 
-    // squares.printRaw(exploreAgents);
+    if ((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts) {
+      squares.printRaw(superAttackAgents);
+    } else {
+      squares.printRaw(attackAgents);
+    }
     
     t0 = System.currentTimeMillis();
     moveAnts();
@@ -831,7 +835,7 @@ public class MyBot extends Bot {
     logFine("issueOrders: " + (System.currentTimeMillis() - t0));
     
     logFine("ants died: " + ants.getMyDeadAnts().size());
-    logFine("attack ants: " + attackAnts.size() + " enemy hills: " + enemyHills.size());
+    logFine("explore ants (" + maxExploreAnts + "): " + (ants.getMyAnts().size() - attackAnts.size()) + " attack ants: " + attackAnts.size() + " enemy hills: " + enemyHills.size());
     logFine("----- done ----- " + ants.getTimeRemaining());
     turn++;
   }
