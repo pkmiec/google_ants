@@ -186,6 +186,14 @@ public class Ants {
       return aggressionOffsets;
     }
 
+    public Set<Tile> getTiles(Tile loc, Set<Tile> offsets) {
+      Set<Tile> tiles = new HashSet<Tile>();
+      for (Tile offset : offsets) {
+        tiles.add(getTile(loc, offset));
+      }
+      return tiles;
+    }
+
     /**
      * Returns squared spawn radius of each ant.
      * 
