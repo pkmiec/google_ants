@@ -34,6 +34,7 @@ public class MyBot extends Bot {
   Set<Tile> enemyDeadHills  = new HashSet<Tile>();
   Set<Tile> attackAnts = new HashSet<Tile>();
   int maxExploreAnts = 0;
+  boolean enemyHillDied = false;
   
   Map<Tile, Set<Tile>> combatAnts = null;
   
@@ -48,7 +49,7 @@ public class MyBot extends Bot {
 
   final AgentMap attackAgents  = new AgentMap();
   {
-    attackAgents.put(Agent.EXPLORE, 20);
+    attackAgents.put(Agent.EXPLORE, 10);
     attackAgents.put(Agent.DEFEND, 100);
     attackAgents.put(Agent.ATTACK, 50);
     attackAgents.put(Agent.ENEMY_ANTS, 30);
@@ -56,10 +57,10 @@ public class MyBot extends Bot {
 
   final AgentMap superAttackAgents  = new AgentMap();
   {
-    attackAgents.put(Agent.EXPLORE, 0);
-    attackAgents.put(Agent.DEFEND, 100);
-    attackAgents.put(Agent.ATTACK, 50);
-    attackAgents.put(Agent.ENEMY_ANTS, 30);
+    superAttackAgents.put(Agent.EXPLORE, 5);
+    superAttackAgents.put(Agent.DEFEND, 100);
+    superAttackAgents.put(Agent.ATTACK, 50);
+    superAttackAgents.put(Agent.ENEMY_ANTS, 30);
   }
   
   final AgentMap exploreAgents = new AgentMap();
@@ -72,10 +73,10 @@ public class MyBot extends Bot {
 
   final AgentMap superExploreAgents = new AgentMap();
   {
-    exploreAgents.put(Agent.EXPLORE, 50);
-    exploreAgents.put(Agent.DEFEND, 100);
-    exploreAgents.put(Agent.ATTACK, 0);
-    exploreAgents.put(Agent.ENEMY_ANTS, 30);
+    superExploreAgents.put(Agent.EXPLORE, 50);
+    superExploreAgents.put(Agent.DEFEND, 100);
+    superExploreAgents.put(Agent.ATTACK, 0);
+    superExploreAgents.put(Agent.ENEMY_ANTS, 30);
   }  
 
   class CombatValues {
@@ -249,8 +250,6 @@ public class MyBot extends Bot {
         case ATTACK:
           if (enemyHills.contains(this)) {
             setInitValue(agent, 100);
-          } else if (enemyDeadHills.contains(this)) {
-            setInitValue(agent, 0);
           } else if (ants.getMyHills().contains(this)) {
             setInitValue(agent, 0);
           }
@@ -396,11 +395,10 @@ public class MyBot extends Bot {
       this.deadEnds = new HashSet<Tile>();
     }
 
-    public void clear() {
+    public void clear(final Agent[] agents) {
       for (int r = 0; r < rows ; r++) {
         for (int c = 0; c < cols; c++) {
-          squares[r][c].setValue(Agent.DEFEND, 0.0);
-          squares[r][c].setValue(Agent.ENEMY_ANTS, 0.0);
+          squares[r][c].setValue(agents, 0.0);
         }
       }
     }
@@ -501,10 +499,14 @@ public class MyBot extends Bot {
     }
     
     public List<AimValue> getDirectionsFor(final Tile tile) {
-      if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
-        return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
+      if (enemyHills.size() > 0) {
+        if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
+          return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
+        } else {
+          return attackAnts.contains(tile) ? getDirections(attackAgents, tile, -1) : getDirections(exploreAgents, tile, -1);
+        }
       } else {
-        return attackAnts.contains(tile) ? getDirections(attackAgents, tile, -1) : getDirections(exploreAgents, tile, -1);
+        return getDirections(exploreAgents, tile, -1);
       }
     }
     
@@ -589,10 +591,12 @@ public class MyBot extends Bot {
     }
 
     // Remove hills that are no longer active
+    enemyHillDied = false;
     for (Iterator<Tile> it = enemyHills.iterator(); it.hasNext(); ) {
       Tile enemyHill = it.next();
       if (ants.isVisible(enemyHill) && !ants.getEnemyHills().contains(enemyHill)) {
         enemyDeadHills.add(enemyHill);
+        enemyHillDied = true;
         it.remove();
       }
     }
@@ -814,17 +818,24 @@ public class MyBot extends Bot {
     long t0;
     
     t0 = System.currentTimeMillis();
-    squares.clear();
+    squares.clear(new Agent[] { Agent.ENEMY_ANTS, Agent.DEFEND });
+    if (enemyHillDied) {
+      squares.clear(new Agent[] { Agent.ATTACK });
+      if (enemyHills.size() > 0) {
+        for (int i = 0; i < 100; i++) {
+          squares.diffuse(Agent.ATTACK);
+        }
+      }
+    }
     for (int i = 0; i < Math.min(turn, 10); i++) {
       squares.diffuse();
     }
     logFine("diffusion: " + (System.currentTimeMillis() - t0));
 
-    if ((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts) {
-      squares.printRaw(superAttackAgents);
-    } else {
-      squares.printRaw(attackAgents);
-    }
+    // logFine("<<<<<<<<<<< attack");
+    squares.printRaw(superAttackAgents);
+    // logFine(">>>>>>>>>>> explore");
+    // squares.printRaw(exploreAgents);
     
     t0 = System.currentTimeMillis();
     moveAnts();
