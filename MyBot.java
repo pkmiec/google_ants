@@ -828,7 +828,12 @@ public class MyBot extends Bot {
       }
     }
     for (int i = 0; i < Math.min(turn, 10); i++) {
-      squares.diffuse();
+      squares.diffuse(Agent.EXPLORE);
+      squares.diffuse(Agent.DEFEND);
+      squares.diffuse(Agent.ENEMY_ANTS);
+      if (enemyHills.size() > 0) {
+        squares.diffuse(Agent.ATTACK);
+      }
     }
     logFine("diffusion: " + (System.currentTimeMillis() - t0));
 
