@@ -49,10 +49,10 @@ public class MyBot extends Bot {
 
   final AgentMap attackAgents  = new AgentMap();
   {
-    attackAgents.put(Agent.EXPLORE, 10);
+    attackAgents.put(Agent.EXPLORE, 20);
     attackAgents.put(Agent.DEFEND, 100);
     attackAgents.put(Agent.ATTACK, 50);
-    attackAgents.put(Agent.ENEMY_ANTS, 30);
+    attackAgents.put(Agent.ENEMY_ANTS, 0);
   }
 
   final AgentMap superAttackAgents  = new AgentMap();
@@ -60,7 +60,7 @@ public class MyBot extends Bot {
     superAttackAgents.put(Agent.EXPLORE, 5);
     superAttackAgents.put(Agent.DEFEND, 100);
     superAttackAgents.put(Agent.ATTACK, 50);
-    superAttackAgents.put(Agent.ENEMY_ANTS, 30);
+    superAttackAgents.put(Agent.ENEMY_ANTS, 0);
   }
   
   final AgentMap exploreAgents = new AgentMap();
@@ -108,8 +108,8 @@ public class MyBot extends Bot {
 
           // An ant is only an attacker if it is in attack radius or can move into attack radius in one 
           // move (i.e. it is not blocked by water). This should allow me to sometimes attack through 
-          // water.
-          if (ants.getAttackOffsets().contains(offset) || canAntMoveToAttackTargetAnt(loc, tile)) {
+          // water. Also, my ant is only an attacker if it is already in attack offset (as it has already moved).
+          if (ants.getAttackOffsets().contains(offset) || (locOwner != 0 && canAntMoveToAttackTargetAnt(loc, tile))) {
             tileAttackers++;
           }
         }
@@ -128,7 +128,7 @@ public class MyBot extends Bot {
         }
       }
 
-      logFiner(ant + " cannot move to attack " + targetAnt);
+      // logFiner(ant + " cannot move to attack " + targetAnt);
       return false;
     }
 
@@ -170,7 +170,7 @@ public class MyBot extends Bot {
     
         if (locOwner != null && locOwner != owner) {
           int locAttackers = getTileAttackers(loc, locOwner, ants.getAggressionOffsets()); // ants attacking them
-          // logFinest("attacking difference: " + myAttackers + " " + locAttackers);
+          logFinest("attacking difference: " + myAttackers + " " + locAttackers);
           if (kamikaze) {
             if (myAttackers > locAttackers) { return true; }
           } else {
@@ -482,8 +482,8 @@ public class MyBot extends Bot {
     }
     
     public void printRaw(AgentMap agentMap) {
-      for (int r = 0; r < Math.min(64, rows); r++) {
-        for (int c = 0; c < Math.min(64, cols); c++) {
+      for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
           if (waterTiles.contains(squares[r][c])) {
             System.err.print("    ");
           } else if (deadEnds.contains(squares[r][c])) {
@@ -686,7 +686,7 @@ public class MyBot extends Bot {
       Aim aim = route.getDirections().size() == 1 ? null : route.getDirections().get(0);
       if (moveDirection(route.getStart(), aim, tmpOrders)) {
         antsOnTarget.add(route.getEnd());
-        // logFiner(route.getStart() + " -> " + route.getEnd() + " FOOD " + aim);
+        logFiner(route.getStart() + " -> " + route.getEnd() + " FOOD " + aim);
       }
     }
   }
@@ -727,7 +727,7 @@ public class MyBot extends Bot {
         if (aimValue.aim == null) { continue; }
         
         if (!chargeCapableAnt(antLoc, aim)) { 
-          logFiner("-> not capable of charging towards " + aim);
+          // logFiner("-> not capable of charging towards " + aim);
           continue;
         }
 
@@ -742,14 +742,16 @@ public class MyBot extends Bot {
 
           for (Aim sidewayAim: aim.sideways()) {
             Tile sidewayLoc = ants.getTile(antLoc, sidewayAim);
-            if (primaryAim != null) { sidewayLoc = ants.getTile(antLoc, primaryAim); }
+            if (primaryAim != null) { sidewayLoc = ants.getTile(sidewayLoc, primaryAim); }
+            // logFiner(sidewayAim + " " + primaryAim + " considering " + sidewayLoc);
             while (ants.getMyAnts().contains(sidewayLoc) && chargeCapableAnt(sidewayLoc, aim)) {
               waveAnts.add(sidewayLoc);
               sidewayLoc = ants.getTile(sidewayLoc, sidewayAim);
-              if (primaryAim != null) { sidewayLoc = ants.getTile(antLoc, primaryAim); }
+              if (primaryAim != null) { sidewayLoc = ants.getTile(sidewayLoc, primaryAim); }
+              // logFiner(sidewayAim + " " + primaryAim + " considering " + sidewayLoc);
             }
 
-            if (primaryAim != null) { primaryAim.opposite(); }
+            if (primaryAim != null) { primaryAim = primaryAim.opposite(); }
           }
 
           if (waveAnts.size() < 3) {
@@ -804,13 +806,13 @@ public class MyBot extends Bot {
       List<AimValue> directions = squares.getDirectionsFor(antLoc);
       antsDirections.put(antLoc, directions);
       
-      // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
+      logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
       for (Iterator<AimValue> it = directions.iterator(); it.hasNext(); ) {
         AimValue aimValue = it.next();
         it.remove();
         
         if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
-          // logFiner(" -> " + aimValue.aim);
+          logFiner(" -> " + aimValue.aim);
           break;
         }
       }
@@ -843,7 +845,7 @@ public class MyBot extends Bot {
         if (combatValues.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc))) {
           antLoc = oldLoc;
           it.remove();
-          // logFiner(oldLoc + " ->  " + newLoc + " will die");
+          logFiner(oldLoc + " ->  " + newLoc + " will die");
           break;
         }
       }
@@ -855,14 +857,14 @@ public class MyBot extends Bot {
         directions = squares.getDirectionsFor(antLoc);
         antsDirections.put(antLoc, directions);
       }
-      // logFiner(antLoc + " " + directions);
+      logFiner(antLoc + " " + directions);
       
       for (Iterator<AimValue> it =  directions.iterator(); it.hasNext(); ) {
         AimValue aimValue = it.next();
         it.remove();
 
         if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
-          // logFiner(" -> " + aimValue.aim);
+          logFiner(" -> " + aimValue.aim);
           break;
         }
       }
@@ -899,20 +901,24 @@ public class MyBot extends Bot {
     attackAnts = newAttackAnts;
   }
 
-  public void doTurn() {
-    long t0;
-
+  int accelerateAttackDiffusion = 0;
+  public void diffuse() {
     boolean enemyHillDiscovered = enemyHillsLastTurn < enemyHills.size();
     boolean enemyHillDied       = enemyDeadHillsLastTurn < enemyDeadHills.size();
     enemyHillsLastTurn = enemyHills.size();
     enemyDeadHillsLastTurn = enemyDeadHills.size();
     
-    t0 = System.currentTimeMillis();
     squares.clear(new Agent[] { Agent.ENEMY_ANTS, Agent.DEFEND });
 
     if ((enemyHillDied && enemyHills.size() > 0) || (enemyHillDiscovered && enemyHills.size() == 1)) {
-      logFiner("enemy hill died or discovered");
-      squares.clear(new Agent[] { Agent.ATTACK });
+      // logFiner("enemy hill died or discovered");
+      if (enemyHillDied) {
+        squares.clear(new Agent[] { Agent.ATTACK });
+      }
+      accelerateAttackDiffusion = 5;
+    }
+
+    if (accelerateAttackDiffusion > 0) {
       for (int i = 0; i < 100; i++) {
         squares.diffuse(Agent.ATTACK);
       }
@@ -921,16 +927,27 @@ public class MyBot extends Bot {
 
       logFiner(">>>>>> super attack");
       squares.printRaw(superAttackAgents);
+      
+      accelerateAttackDiffusion--;
+    }
+    if (enemyHills.size() > 0 && turn > 10) {
+      for (int i = 0; i < 50; i++) {
+        squares.diffuse(Agent.ATTACK);
+      }
     }
     
     for (int i = 0; i < Math.min(turn, 10); i++) {
       squares.diffuse(Agent.EXPLORE);
       squares.diffuse(Agent.DEFEND);
       squares.diffuse(Agent.ENEMY_ANTS);
-      if (enemyHills.size() > 0) {
-        squares.diffuse(Agent.ATTACK);
-      }
     }
+  }
+  
+  public void doTurn() {
+    long t0;
+
+    t0 = System.currentTimeMillis();
+    diffuse();
     logFine("diffusion: " + (System.currentTimeMillis() - t0));
 
     t0 = System.currentTimeMillis();
