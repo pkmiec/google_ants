@@ -32,6 +32,10 @@ public enum Aim {
     
     private final char symbol;
     
+    private Aim opposite;
+    
+    private Aim[] sideways;
+    
     Aim(int rowDelta, int colDelta, char symbol) {
         this.rowDelta = rowDelta;
         this.colDelta = colDelta;
@@ -75,4 +79,31 @@ public enum Aim {
     public static Aim fromSymbol(char symbol) {
         return symbolLookup.get(symbol);
     }
+    
+    public Aim opposite() {
+      if (opposite == null) {
+        if (this == Aim.NORTH) {
+          opposite = Aim.SOUTH;
+        } else if (this == Aim.SOUTH) {
+          opposite = Aim.NORTH;
+        } else if (this == Aim.WEST) {
+          opposite = Aim.EAST;
+        } else if (this == Aim.EAST) {
+          opposite = Aim.WEST;
+        } 
+      }
+      return opposite;
+    }
+    
+    public Aim[] sideways() {
+      if (sideways == null) {
+        if (this == Aim.NORTH || this == Aim.SOUTH) {
+          sideways = new Aim[] { Aim.WEST, Aim.EAST };
+        } else {
+          sideways = new Aim[] { Aim.NORTH, Aim.SOUTH };
+        } 
+      }
+      return sideways;
+    }
+    
 }
