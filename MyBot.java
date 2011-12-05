@@ -29,6 +29,7 @@ public class MyBot extends Bot {
   Map<Tile, Tile> orders     = new HashMap<Tile, Tile>();
   Set<Tile> waterTiles       = new HashSet<Tile>();
   Set<Tile> enemyHills       = new HashSet<Tile>();
+  Set<Tile> enemyHillsWithVisibleRoute = new HashSet<Tile>();
   Set<Tile> enemyDeadHills   = new HashSet<Tile>();
   int enemyHillsLastTurn     = 0;
   int enemyDeadHillsLastTurn = 0;
@@ -47,6 +48,11 @@ public class MyBot extends Bot {
 
   class AgentMap extends HashMap<Agent,Integer> {}
 
+  final AgentMap debugAgents  = new AgentMap();
+  {
+    debugAgents.put(Agent.ATTACK, 100);
+  }
+  
   final AgentMap attackAgents  = new AgentMap();
   {
     attackAgents.put(Agent.EXPLORE, 20);
@@ -68,15 +74,15 @@ public class MyBot extends Bot {
     exploreAgents.put(Agent.EXPLORE, 50);
     exploreAgents.put(Agent.DEFEND, 100);
     exploreAgents.put(Agent.ATTACK, 20);
-    exploreAgents.put(Agent.ENEMY_ANTS, 0);
+    // exploreAgents.put(Agent.ENEMY_ANTS, 0);
   }  
 
   final AgentMap superExploreAgents = new AgentMap();
   {
     superExploreAgents.put(Agent.EXPLORE, 50);
     superExploreAgents.put(Agent.DEFEND, 100);
-    superExploreAgents.put(Agent.ATTACK, 0);
-    superExploreAgents.put(Agent.ENEMY_ANTS, 0);
+    // superExploreAgents.put(Agent.ATTACK, 0);
+    // superExploreAgents.put(Agent.ENEMY_ANTS, 0);
   }  
 
   class AimAttackers implements Comparable<AimAttackers> {
@@ -278,7 +284,11 @@ public class MyBot extends Bot {
             }
           } else {
             if (ants.getEnemyAnts().contains(this)) {
-              setInitValue(agent, 25);
+              if (ants.getMyHills().size() == 0) {
+                setInitValue(agent, -25);  
+              } else {
+                setInitValue(agent, 25);
+              }
             } else if (ants.getMyAnts().contains(this)) {
               if (!combatAnts.containsKey(this)) {
                 setInitValue(agent, 0);
@@ -288,7 +298,7 @@ public class MyBot extends Bot {
           }
           break;
         case ATTACK:
-          if (enemyHills.contains(this)) {
+          if (enemyHillsWithVisibleRoute.contains(this)) {
             setInitValue(agent, 100);
           } else if (ants.getMyHills().contains(this)) {
             setInitValue(agent, 0);
@@ -366,7 +376,7 @@ public class MyBot extends Bot {
               } else {
                 setInitValue(agent, -40);
               }
-            } else if (enemyHills.contains(this)) {
+            } else if (enemyHillsWithVisibleRoute.contains(this)) {
               setInitValue(agent, 100);
             }
           }
@@ -539,15 +549,15 @@ public class MyBot extends Bot {
     }
     
     public List<AimValue> getDirectionsFor(final Tile tile) {
-      if (enemyHills.size() > 0) {
-        if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
-          return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
-        } else {
-          return attackAnts.contains(tile) ? getDirections(attackAgents, tile, -1) : getDirections(exploreAgents, tile, -1);
-        }
-      } else {
+      // if (ants.getMyHills().size() > 0 && enemyHillsWithVisibleRoute.size() > 0) {
+      //   if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
+      //     return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
+      //   } else {
+      //     return attackAnts.contains(tile) ? getDirections(attackAgents, tile, -1) : getDirections(exploreAgents, tile, -1);
+      //   }
+      // } else {
         return getDirections(exploreAgents, tile, -1);
-      }
+      // }
     }
     
     public List<AimValue> getDirections(final AgentMap agentMap, final Tile tile, final int ascending) {
@@ -567,6 +577,10 @@ public class MyBot extends Bot {
         Collections.sort(values, Collections.reverseOrder());
       }
       return values;
+    }
+
+    public boolean hasBeenSeen(final Tile tile) {
+      return squares[tile.getRow()][tile.getCol()].seenOnTurn != -1;
     }
 
     // public List<AimValue> getProbabilisticDirections(final Agent agent, final Tile tile, final int ascending) {
@@ -979,38 +993,7 @@ public class MyBot extends Bot {
 
   int accelerateAttackDiffusion = 0;
   public void diffuse() {
-    boolean enemyHillDiscovered = enemyHillsLastTurn < enemyHills.size();
-    boolean enemyHillDied       = enemyDeadHillsLastTurn < enemyDeadHills.size();
-    enemyHillsLastTurn = enemyHills.size();
-    enemyDeadHillsLastTurn = enemyDeadHills.size();
-    
     squares.clear(new Agent[] { Agent.ENEMY_ANTS, Agent.DEFEND });
-
-    if ((enemyHillDied && enemyHills.size() > 0) || (enemyHillDiscovered && enemyHills.size() == 1)) {
-      // logFiner("enemy hill died or discovered");
-      if (enemyHillDied) {
-        squares.clear(new Agent[] { Agent.ATTACK });
-      }
-      accelerateAttackDiffusion = 5;
-    }
-
-    if (accelerateAttackDiffusion > 0) {
-      for (int i = 0; i < 100; i++) {
-        squares.diffuse(Agent.ATTACK);
-      }
-      // logFiner(">>>>>> attack");
-      // squares.printRaw(attackAgents);
-      // 
-      // logFiner(">>>>>> super attack");
-      // squares.printRaw(superAttackAgents);
-      
-      accelerateAttackDiffusion--;
-    }
-    if (enemyHills.size() > 0 && turn > 10) {
-      for (int i = 0; i < 50; i++) {
-        squares.diffuse(Agent.ATTACK);
-      }
-    }
 
     boolean hillsUnderAttack = false;
     for (Tile myHill: ants.getMyHills()) {
@@ -1027,6 +1010,52 @@ public class MyBot extends Bot {
         squares.diffuse(Agent.DEFEND);
       }
     }
+
+    boolean enemyHillDiscovered = enemyHillsLastTurn == 0 && enemyHillsWithVisibleRoute.size() > 0;
+    boolean enemyHillDied       = enemyDeadHillsLastTurn < enemyDeadHills.size();
+    enemyHillsLastTurn = enemyHillsWithVisibleRoute.size();
+    enemyDeadHillsLastTurn = enemyDeadHills.size();
+
+    if (enemyHillDied || enemyHillDiscovered) {
+      // logFiner("enemy hill died or discovered");
+      squares.clear(new Agent[] { Agent.ATTACK });
+      
+      if (enemyHillsWithVisibleRoute.size() > 0) {
+        accelerateAttackDiffusion = 5;
+      }
+    }
+
+    if (accelerateAttackDiffusion > 0) {
+      for (int i = 0; i < 100; i++) {
+        squares.diffuse(Agent.ATTACK);
+      }
+      // logFiner(">>>>>> attack");
+      // squares.printRaw(attackAgents);
+      // 
+      // logFiner(">>>>>> super attack");
+      // squares.printRaw(superAttackAgents);
+      
+      accelerateAttackDiffusion--;
+    }
+    if (enemyHillsWithVisibleRoute.size() > 0 && turn > 10) {
+      for (int i = 0; i < 50; i++) {
+        squares.diffuse(Agent.ATTACK);
+      }
+    }
+
+    enemyHillsWithVisibleRoute.retainAll(enemyHills);
+    for (Tile enemyHill: enemyHills) {
+      if (enemyHillsWithVisibleRoute.contains(enemyHills)) { continue; }
+      
+      for (Tile myHill: ants.getMyHills()) {
+        if (new Router(myHill, enemyHill).directions() != null) {
+          enemyHillsWithVisibleRoute.add(enemyHill);
+          break;
+        }
+      }
+    }
+    
+    squares.printRaw(debugAgents);  
   }
   
   public void doTurn() {
@@ -1049,7 +1078,7 @@ public class MyBot extends Bot {
     logFine("issueOrders: " + (System.currentTimeMillis() - t0));
     
     logFine("ants died: " + ants.getMyDeadAnts().size());
-    logFine("explore ants (" + maxExploreAnts + "): " + (ants.getMyAnts().size() - attackAnts.size()) + " attack ants: " + attackAnts.size() + " enemy hills: " + enemyHills.size());
+    logFine("explore ants (" + maxExploreAnts + "): " + (ants.getMyAnts().size() - attackAnts.size()) + " attack ants: " + attackAnts.size() + " enemy hills: " + enemyHills.size() + " (" + enemyHillsWithVisibleRoute.size() + ")");
     logFine("----- done ----- " + ants.getTimeRemaining());
     turn++;
   }
@@ -1110,9 +1139,10 @@ public class MyBot extends Bot {
 
         for (Aim direction : Aim.values()) {
           Tile y = ants.getTile(x, direction);
-          if (closedSet.contains(y))        { continue; }
-          if (waterTiles.contains(y))       { continue; }
+          if (closedSet.contains(y))         { continue; }
+          if (waterTiles.contains(y))        { continue; }
           if (ants.getMyHills().contains(y)) { continue; }
+          if (!squares.hasBeenSeen(y))       { continue; }
 
           // System.err.println("considering: " + y);
           float distance = 1.0f;
