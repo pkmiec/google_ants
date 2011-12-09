@@ -54,32 +54,30 @@ public class MyBot extends Bot {
   
   final AgentMap attackAgents  = new AgentMap();
   {
-    attackAgents.put(Agent.EXPLORE, 15);
-    attackAgents.put(Agent.DEFEND, 100);
-    attackAgents.put(Agent.ENEMY_HILLS, 50);
     attackAgents.put(Agent.ENEMY_ANTS, 25);
+    attackAgents.put(Agent.ENEMY_HILLS, 50);
+    attackAgents.put(Agent.DEFEND, 100);
   }
 
-  final AgentMap superAttackAgents  = new AgentMap();
-  {
-    superAttackAgents.put(Agent.EXPLORE, 5);
-    superAttackAgents.put(Agent.DEFEND, 100);
-    superAttackAgents.put(Agent.ENEMY_HILLS, 50);
-    superAttackAgents.put(Agent.ENEMY_ANTS, 5);
-  }
+  // final AgentMap superAttackAgents  = new AgentMap();
+  // {
+  //   superAttackAgents.put(Agent.EXPLORE, 5);
+  //   superAttackAgents.put(Agent.DEFEND, 100);
+  //   superAttackAgents.put(Agent.ENEMY_HILLS, 50);
+  //   superAttackAgents.put(Agent.ENEMY_ANTS, 5);
+  // }
   
   final AgentMap exploreAgents = new AgentMap();
   {
     exploreAgents.put(Agent.EXPLORE, 50);
     exploreAgents.put(Agent.DEFEND, 100);
-    exploreAgents.put(Agent.ENEMY_HILLS, 20);
   }  
 
-  final AgentMap superExploreAgents = new AgentMap();
-  {
-    superExploreAgents.put(Agent.EXPLORE, 50);
-    superExploreAgents.put(Agent.DEFEND, 100);
-  }  
+  // final AgentMap superExploreAgents = new AgentMap();
+  // {
+  //   superExploreAgents.put(Agent.EXPLORE, 50);
+  //   superExploreAgents.put(Agent.DEFEND, 100);
+  // }  
 
   class AimAttackers implements Comparable<AimAttackers> {
     public final Aim aim;
@@ -285,22 +283,28 @@ public class MyBot extends Bot {
                 setInitValue(agent, 25);
               } else if (ants.getMyAnts().contains(this)) {
                 if (!combatAnts.containsKey(this)) {
-                  setInitValue(agent, 0);
+                  setInitValue(agent, -10);
                 }
               }
             } else {
               if (ants.getEnemyAnts().contains(this)) {
-                setInitValue(agent, 0);  
+                setInitValue(agent, -10);  
               }
             }
             seenOnTurn = turn;
           }
           break;
         case ENEMY_HILLS:
-          if (enemyHills.contains(this)) {
-            setInitValue(agent, 100);
-          } else if (ants.getMyHills().contains(this)) {
-            setInitValue(agent, 0);
+          if (enemyHills.size() == 0) {
+            if (seenOnTurn == -1) {
+              setInitValue(agent, 100);
+            } 
+          } else {
+            if (enemyHills.contains(this)) {
+              setInitValue(agent, 100);
+            } else if (ants.getMyHills().contains(this)) {
+              setInitValue(agent, 0);
+            }
           }
           break;
         case ENEMY_ANTS:
@@ -535,11 +539,11 @@ public class MyBot extends Bot {
     
     public List<AimValue> getDirectionsFor(final Tile tile) {
       if (ants.getMyHills().size() > 0) {
-        if (enemyHills.size() > 0 && ((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
-          return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
-        } else {
+        // if (enemyHills.size() > 0 && ((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
+        //   return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
+        // } else {
           return attackAnts.contains(tile) ? getDirections(attackAgents, tile, -1) : getDirections(exploreAgents, tile, -1);
-        }
+        // }
       } else {
         return getDirections(exploreAgents, tile, -1);
       }
@@ -857,14 +861,15 @@ public class MyBot extends Bot {
       // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
       while (directions.size() > 0) {
         AimValue aimValue = directions.remove(0);
-        if (aimValue.aim == null && directions.size() > 0) { 
-          directions.add(aimValue); 
-          aimValue = directions.remove(0);
-        }
                 
         if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
           // logFiner(" -> " + aimValue.aim);
           break;
+        }
+        
+        if (directions.size() > 1 && directions.get(0).aim == null) {
+          directions.add(directions.remove(0));
+          logFiner(antLoc + " replacing null with " + aimValue.aim);
         }
       }
 
