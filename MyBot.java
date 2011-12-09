@@ -266,7 +266,7 @@ public class MyBot extends Bot {
           if (ants.getEnemyAnts().contains(this)) {
             for (Tile myHill: ants.getMyHills()) {
               if (combatAnts.get(myHill) != null && combatAnts.get(myHill).contains(this)) {
-                values[agent.ordinal()] = 100;
+                setInitValue(agent, 100);
                 break;
               }
             }
@@ -981,19 +981,19 @@ public class MyBot extends Bot {
       }
     }
 
-    boolean enemyHillDiscovered = enemyHillsLastTurn == 0 && enemyHills.size() > 0;
-    boolean enemyHillDied       = enemyDeadHillsLastTurn < enemyDeadHills.size();
-    enemyHillsLastTurn = enemyHills.size();
-    enemyDeadHillsLastTurn = enemyDeadHills.size();
-
-    if (enemyHillDied) {
-      // logFiner("enemy hill died or discovered");
-      squares.clear(new Agent[] { Agent.ENEMY_HILLS });
-      
-      // if (enemyHills.size() > 0) {
-      //   accelerateAttackDiffusion = 5;
-      // }
-    }
+    // boolean enemyHillDiscovered = enemyHillsLastTurn == 0 && enemyHills.size() > 0;
+    // boolean enemyHillDied       = enemyDeadHillsLastTurn < enemyDeadHills.size();
+    // enemyHillsLastTurn = enemyHills.size();
+    // enemyDeadHillsLastTurn = enemyDeadHills.size();
+    // 
+    // if (enemyHillDied) {
+    //   // logFiner("enemy hill died or discovered");
+    //   squares.clear(new Agent[] { Agent.ENEMY_HILLS });
+    //   
+    //   // if (enemyHills.size() > 0) {
+    //   //   accelerateAttackDiffusion = 5;
+    //   // }
+    // }
 
     // if (accelerateAttackDiffusion > 0) {
     //   for (int i = 0; i < 100; i++) {
@@ -1007,11 +1007,11 @@ public class MyBot extends Bot {
     //   
     //   accelerateAttackDiffusion--;
     // }
-    if (enemyHills.size() > 0 && turn > 10) {
+    // if (enemyHills.size() > 0 && turn > 10) {
       for (int i = 0; i < 50; i++) {
         squares.influence(Agent.ENEMY_HILLS);
       }
-    }
+    // }
     
     //squares.printRaw(attackAgents);
   }
