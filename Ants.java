@@ -230,6 +230,8 @@ public class Ants {
      * @return location in <code>direction</code> from <cod>tile</code>
      */
     public Tile getTile(Tile tile, Aim direction) {
+      if (direction == null) { return tile; }
+      
         int row = (tile.getRow() + direction.getRowDelta()) % rows;
         if (row < 0) {
             row += rows;

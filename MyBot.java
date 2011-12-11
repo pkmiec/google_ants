@@ -41,43 +41,41 @@ public class MyBot extends Bot {
   enum Agent {
     EXPLORE,
     DEFEND,
-    ENEMY_HILLS,
+    ATTACK,
     ENEMY_ANTS;
   }
 
   class AgentMap extends HashMap<Agent,Integer> {}
 
-  final AgentMap debugAgents  = new AgentMap();
-  {
-    debugAgents.put(Agent.ENEMY_HILLS, 100);
-  }
-  
   final AgentMap attackAgents  = new AgentMap();
   {
-    attackAgents.put(Agent.ENEMY_ANTS, 25);
-    attackAgents.put(Agent.ENEMY_HILLS, 50);
+    attackAgents.put(Agent.EXPLORE, 10);
     attackAgents.put(Agent.DEFEND, 100);
+    attackAgents.put(Agent.ATTACK, 50);
+    attackAgents.put(Agent.ENEMY_ANTS, 30);
   }
 
-  // final AgentMap superAttackAgents  = new AgentMap();
-  // {
-  //   superAttackAgents.put(Agent.EXPLORE, 5);
-  //   superAttackAgents.put(Agent.DEFEND, 100);
-  //   superAttackAgents.put(Agent.ENEMY_HILLS, 50);
-  //   superAttackAgents.put(Agent.ENEMY_ANTS, 5);
-  // }
+  final AgentMap superAttackAgents  = new AgentMap();
+  {
+    superAttackAgents.put(Agent.EXPLORE, 5);
+    superAttackAgents.put(Agent.DEFEND, 100);
+    superAttackAgents.put(Agent.ATTACK, 50);
+    superAttackAgents.put(Agent.ENEMY_ANTS, 30);
+  }
   
   final AgentMap exploreAgents = new AgentMap();
   {
     exploreAgents.put(Agent.EXPLORE, 50);
     exploreAgents.put(Agent.DEFEND, 100);
+    exploreAgents.put(Agent.ENEMY_ANTS, 30);
   }  
 
-  // final AgentMap superExploreAgents = new AgentMap();
-  // {
-  //   superExploreAgents.put(Agent.EXPLORE, 50);
-  //   superExploreAgents.put(Agent.DEFEND, 100);
-  // }  
+  final AgentMap superExploreAgents = new AgentMap();
+  {
+    superExploreAgents.put(Agent.EXPLORE, 50);
+    superExploreAgents.put(Agent.DEFEND, 100);
+    superExploreAgents.put(Agent.ENEMY_ANTS, 30);
+  }  
 
   class AimAttackers implements Comparable<AimAttackers> {
     public final Aim aim;
@@ -98,130 +96,108 @@ public class MyBot extends Bot {
   }
 
   class CombatValues {
+    final Map<Tile, Integer> tilesAttackers;
+    final Map<Tile, Integer> tilesDefenders;
     final Map<Tile, Integer> antsOwners;
-    final Map<Tile, List<AimAttackers>> enemyChoices;
-    final Map<Tile, Set<Tile>> myPotentialAttackers;
     
     public CombatValues() {
       this(ants.getAnts());
     }
     
     public CombatValues(Map<Tile,Integer> antsOwners) {
+      this.tilesAttackers = new HashMap<Tile, Integer>();
+      this.tilesDefenders = new HashMap<Tile, Integer>();
       this.antsOwners = antsOwners;
-      this.enemyChoices = new HashMap<Tile, List<AimAttackers>>();
-      this.myPotentialAttackers = new HashMap<Tile, Set<Tile>>();
+    }
+    
+    public int getTileAttackers(Tile tile, int owner, Set<Tile> offsets) {
+      if (tilesAttackers.containsKey(tile)) {
+        return tilesAttackers.get(tile);
+      }
       
-      for (Tile antLoc: antsOwners.keySet()) {
-        if (antsOwners.get(antLoc) != 0) { continue; }
-        
-        Set<Tile> potentialAttackers = getPotentialAttackers(antLoc, 0);
-        if (potentialAttackers.size() == 0) { continue; }
-                
-        for (Tile enemyLoc : potentialAttackers) {
-          List<AimAttackers> choices = enemyChoices.get(enemyLoc);
-          if (choices != null) { continue; }
-          
-          choices = getEnemyChoices(enemyLoc, antsOwners.get(enemyLoc));
-          // logFinest(enemyLoc + " choices: " + choices);
-          enemyChoices.put(enemyLoc, choices);
-        }
-        
-        myPotentialAttackers.put(antLoc, potentialAttackers);
-        // logFinest(antLoc + " potential attackers " + potentialAttackers);
-      }
-    }
-    
-    public boolean willDie(Tile antLoc, boolean kamikaze) {
-      Set<Tile> potentialAttackers = myPotentialAttackers.get(antLoc);
-      if (potentialAttackers == null || potentialAttackers.size() == 0) { return false; }
-
-      for (Tile potentialAttacker: potentialAttackers) {
-        int numWaysMyAntDies     = 0;
-        int numWaysBothAntDie    = 0;
-        int numWaysEnemyAntDies  = 0;
-        int numWaysNeitherAntDie = 0;
-
-        List<AimAttackers> choices = enemyChoices.get(potentialAttacker);
-        for (AimAttackers choice: choices) {
-          if (choice.attackers.contains(antLoc)) {
-            if (choice.attackers.size() > potentialAttackers.size()) {
-              numWaysEnemyAntDies++;
-            } else if (choice.attackers.size() == potentialAttackers.size()) {
-              numWaysBothAntDie++;
-            } else {
-              numWaysMyAntDies++;
-            }
-          } else {
-            numWaysNeitherAntDie++;
-          }
-        }
-        
-        if (ants.getMyAnts().size() > maxExploreAnts * 3) {
-          if (numWaysEnemyAntDies >= 1 || numWaysBothAntDie >= 1) { return false; }
-        } else {
-          if (numWaysMyAntDies >= 1) { return true; }
-          if (numWaysBothAntDie >= 1 && numWaysEnemyAntDies == 0 && !kamikaze) { return true; }
-        }
-      }
-
-      return false;
-    }
-    
-    public void move(Tile fromLoc, Tile toLoc) {
-      // logFinest("move " + fromLoc + " to " + toLoc);
-      Set<Tile> enemiesToUpdate = new HashSet<Tile>();
-
-      antsOwners.remove(fromLoc);
-      antsOwners.put(toLoc, 0);
-      
-      Set<Tile> fromAttackers = myPotentialAttackers.remove(fromLoc);
-      if (fromAttackers != null) { enemiesToUpdate.addAll(fromAttackers); }
-      
-      Set<Tile> toAttackers = getPotentialAttackers(toLoc, 0);
-      if (toAttackers.size() > 0) { 
-        enemiesToUpdate.addAll(toAttackers); 
-        myPotentialAttackers.put(toLoc, toAttackers);
-      }
-
-      for (Tile enemyToUpdate: enemiesToUpdate) {
-        enemyChoices.put(enemyToUpdate, getEnemyChoices(enemyToUpdate, antsOwners.get(enemyToUpdate)));
-      }
-    }
-        
-    private List<AimAttackers> getEnemyChoices(Tile enemyLoc, int owner) {
-      List<AimAttackers> choices = new ArrayList<AimAttackers>();
-      choices.add(new AimAttackers(null, getActualAttackers(enemyLoc, antsOwners.get(enemyLoc))));
-      for (Aim aim: Aim.values()) {
-        Tile aimLoc = ants.getTile(enemyLoc, aim);
-        if (waterTiles.contains(aimLoc)) { continue; }
-        choices.add(new AimAttackers(aim, getActualAttackers(aimLoc, antsOwners.get(enemyLoc))));
-      }
-      return choices;
-    }
-    
-    private Set<Tile> getActualAttackers(Tile tile, int owner) {
-      return getTileAttackers(tile, owner, ants.getAttackOffsets());
-    }
-    
-    private Set<Tile> getPotentialAttackers(Tile tile, int owner) {
-      return getTileAttackers(tile, owner, ants.getAggressionOffsets());
-    }
-    
-    private Set<Tile> getTileAttackers(Tile tile, int owner, Set<Tile> offsets) {
-      Set<Tile> attackers = new HashSet<Tile>();
-      
+      int tileAttackers = 0;
       for (Tile offset : offsets) {
         Tile loc = ants.getTile(tile, offset);
         Integer locOwner = antsOwners.get(loc);
             
         if (locOwner != null && locOwner != owner) {
-          attackers.add(loc);
+
+          // An ant is only an attacker if it is in attack radius or can move into attack radius in one 
+          // move (i.e. it is not blocked by water). This should allow me to sometimes attack through 
+          // water.
+          if (ants.getAttackOffsets().contains(offset) || canAntMoveToAttackTargetAnt(loc, tile)) {
+            tileAttackers++;
+          }
+        }
+      }
+      tilesAttackers.put(tile, tileAttackers);
+      return tileAttackers;
+    }
+
+    private boolean canAntMoveToAttackTargetAnt(Tile ant, Tile targetAnt) {
+      Set<Tile> attackTiles = ants.getTiles(targetAnt, ants.getAttackOffsets());
+      
+      for (Aim aim: Aim.values()) {
+        Tile loc = ants.getTile(ant, aim);
+        if (attackTiles.contains(loc) && !waterTiles.contains(loc)) {
+          return true;
+        }
+      }
+
+      // logFiner(ant + " cannot move to attack " + targetAnt);
+      return false;
+    }
+
+    public int getTileDefenders(Tile tile, int owner, Set<Tile> offsets) {
+      if (tilesDefenders.containsKey(tile)) {
+        return tilesDefenders.get(tile);
+      }
+      
+      int tileDefenders = 0;
+      for (Tile offset : offsets) {
+        Tile loc = ants.getTile(tile, offset);
+        Integer locOwner = antsOwners.get(loc);
+      
+        if (locOwner != null && locOwner == owner) {
+          tileDefenders++;
+        }
+      }
+      tilesDefenders.put(tile, tileDefenders);
+      return tileDefenders;
+    }
+
+    //
+    //
+    //
+    //
+    public boolean willDie(Tile tile, int owner) {
+      return willDie(tile, owner, false);
+    }
+    
+    public boolean willDie(Tile tile, int owner, boolean kamikaze) {
+      int myAttackers = getTileAttackers(tile, owner, ants.getAggressionOffsets()); // ants attacking me
+      int difference = myAttackers;
+  
+      if (myAttackers == 0) { return false; }
+      
+      for (Tile offset : ants.getAggressionOffsets()) {
+        Tile loc = ants.getTile(tile, offset);
+        Integer locOwner = antsOwners.get(loc);
+    
+        if (locOwner != null && locOwner != owner) {
+          int locAttackers = getTileAttackers(loc, locOwner, ants.getAggressionOffsets()); // ants attacking them
+          // logFinest("attacking difference: " + myAttackers + " " + locAttackers);
+          if (kamikaze) {
+            if (myAttackers > locAttackers) { return true; }
+          } else {
+            if (myAttackers >= locAttackers) { return true; }
+          }
         }
       }
       
-      return attackers;
+      return false;
     }
-        
+    
   }
 
   class AimValue implements Comparable<AimValue> {
@@ -278,38 +254,99 @@ public class MyBot extends Bot {
               setInitValue(agent, Math.min(80, 40 + ((turn - seenOnTurn) * 2)));
             }
           } else {
-            if (ants.getMyHills().size() > 0) {
-              if (ants.getEnemyAnts().contains(this)) {
-                setInitValue(agent, 25);
-              } else if (ants.getMyAnts().contains(this)) {
-                if (!combatAnts.containsKey(this)) {
-                  setInitValue(agent, -10);
-                }
-              }
-            } else {
-              if (ants.getEnemyAnts().contains(this)) {
-                setInitValue(agent, -10);  
+            // if (ants.getEnemyAnts().contains(this)) {
+            //   setInitValue(agent, 25);
+            // } else 
+            if (ants.getMyAnts().contains(this)) {
+              if (!combatAnts.containsKey(this)) {
+                setInitValue(agent, 0);
               }
             }
             seenOnTurn = turn;
           }
           break;
-        case ENEMY_HILLS:
-          if (enemyHills.size() == 0) {
-            if (seenOnTurn == -1) {
-              setInitValue(agent, 100);
-            } 
-          } else {
-            if (enemyHills.contains(this)) {
-              setInitValue(agent, 100);
-            } else if (ants.getMyHills().contains(this)) {
-              setInitValue(agent, 0);
-            }
+        case ATTACK:
+          if (enemyHills.contains(this)) {
+            setInitValue(agent, 100);
+          } else if (ants.getMyHills().contains(this)) {
+            setInitValue(agent, 0);
           }
           break;
         case ENEMY_ANTS:
-          if (ants.getEnemyAnts().contains(this)) {
-            setInitValue(agent, 100);
+          // ?a?  ?..  ..?  ...
+          // .x.  ax.  .xa  .x.
+          // ...  ?..  ..?  ?a?
+          //
+          // .a.  .?.  .?.  .?.  
+          // ?x?  ax?  ?xa  ?x?
+          // .?.  .?.  .?.  .a.
+          
+          // blockage detection
+          // ???  .??  .x.  ??.
+          // ???  x??  ???  ??x
+          // .x.  .??  ???  ??.
+          
+          if (!ants.getEnemyAnts().contains(this)) {
+            if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))) {
+              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) {
+                Tile westTile = ants.getTile(this, Aim.WEST);
+                if (ants.getEnemyAnts().contains(ants.getTile(westTile, Aim.NORTH)) 
+                    || ants.getEnemyAnts().contains(ants.getTile(westTile, Aim.SOUTH))) {
+                  setInitValue(agent, -40);
+                } else {
+                  setInitValue(agent, 80);
+                }
+              } else {
+                setInitValue(agent, -40);
+              }
+            } else if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))) {
+              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) { 
+                Tile eastTile = ants.getTile(this, Aim.EAST);
+                if (ants.getEnemyAnts().contains(ants.getTile(eastTile, Aim.NORTH)) 
+                   || ants.getEnemyAnts().contains(ants.getTile(eastTile, Aim.SOUTH))) {
+                  setInitValue(agent, -40);
+                } else {
+                  setInitValue(agent, 80);
+                }
+              } else {
+                setInitValue(agent, -40);
+              }
+            } else if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))) {
+              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) {
+                Tile northTile = ants.getTile(this, Aim.NORTH);
+                if (ants.getEnemyAnts().contains(ants.getTile(northTile, Aim.WEST)) 
+                    || ants.getEnemyAnts().contains(ants.getTile(northTile, Aim.EAST))) {
+                  setInitValue(agent, -40);
+                } else {
+                  setInitValue(agent, 80);
+                
+                }
+              } else {
+                setInitValue(agent, -40);
+              }
+            } else if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) {
+              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))
+                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))) {
+                Tile southTile = ants.getTile(this, Aim.SOUTH);
+                if (ants.getEnemyAnts().contains(ants.getTile(southTile, Aim.WEST)) 
+                   || ants.getEnemyAnts().contains(ants.getTile(southTile, Aim.EAST))) {
+                  setInitValue(agent, -40);
+                } else {
+                  setInitValue(agent, 80);
+                }
+              } else {
+                setInitValue(agent, -40);
+              }
+            } else if (enemyHills.contains(this)) {
+              setInitValue(agent, 100);
+            }
           }
           break;
       }
@@ -378,8 +415,229 @@ public class MyBot extends Bot {
       }
     }
     
-    logFinest(antLoc + " hoard " + hoard);
+    logFiner(antLoc + " hoard " + hoard);
     return hoard;
+  }
+
+  class Combat {
+    int players;
+    int rows;
+    int cols;
+    
+    int[][] total;
+    int[][][] influence;
+    int[][][] occupied;
+    
+    int[][][] enemies;
+    int[][][] status;
+    
+    Aim[] aims = new Aim[] { null, Aim.NORTH, Aim.SOUTH, Aim.EAST, Aim.WEST };
+    
+    public Combat(int players, int rows, int cols) {
+      this.players = players;
+      this.rows    = rows;
+      this.cols    = cols;
+      
+      total     = new int[rows][cols];
+      influence = new int[players][rows][cols];
+      occupied  = new int[players][rows][cols];
+      
+      enemies   = new int[players][rows][cols];
+      status    = new int[players][rows][cols];
+      
+      initInfluence();
+    }
+
+    public boolean willDie(Tile antLoc, int owner, Aim aim) {
+      Tile aimLoc = ants.getTile(antLoc, aim);
+      return status[owner][aimLoc.getRow()][aimLoc.getCol()] == 3;
+    }
+
+    public List<Aim> getKillDirections(Tile antLoc, int owner) {
+      List<Aim> directions = new ArrayList<Aim>();
+      
+      for (Aim aim : aims) {
+        Tile aimLoc = ants.getTile(antLoc, aim);
+        
+        if (status[owner][aimLoc.getRow()][aimLoc.getCol()] == 1) {
+          directions.add(aim);
+        }
+      }
+      Collections.shuffle(directions);
+      return directions;
+    }
+    
+    public AimValue getDirection(Tile antLoc, int owner, List<AimValue> directions, boolean kamikaze) {
+      if (!kamikaze) {
+        for (AimValue aimValue: directions) {
+          Tile aimLoc = ants.getTile(antLoc, aimValue.aim);
+        
+          if (status[owner][aimLoc.getRow()][aimLoc.getCol()] < 2) { return aimValue; }
+        }
+      }
+      
+      for (AimValue aimValue: directions) {
+        Tile aimLoc = ants.getTile(antLoc, aimValue.aim);
+        
+        if (status[owner][aimLoc.getRow()][aimLoc.getCol()] < 3) { return aimValue; }
+      }
+      
+      return directions.get(0);
+    }
+    
+    public void printInfluence(int owner) {
+      print(owner, influence);
+    }
+
+    public void printEnemies(int owner) {
+      print(owner, enemies);
+    }
+      
+    public void printStatus(int owner) {
+      print(owner, status);
+    }
+
+    public void printTotal() {
+      for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+          if (waterTiles.contains(new Tile(r, c))) {
+            System.err.print("  ");
+          } else {
+            int value = total[r][c];
+            System.err.print(String.format("%2d", value));
+          }
+        }
+        System.err.println();
+      }
+      System.err.println();
+    }
+      
+    private void print(int owner, int[][][] values) {
+      for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+          if (waterTiles.contains(new Tile(r, c))) {
+            System.err.print("  ");
+          } else {
+            int value = values[owner][r][c];
+            System.err.print(String.format("%2d", value));
+          }
+        }
+        System.err.println();
+      }
+      System.err.println();
+    }
+    
+    public void rejectMove(Tile antLoc, Aim aim, int owner) {
+    
+    }
+    
+    public void move(Tile antLoc, int owner, Aim aim) {
+      Set<Tile> influenceTiles = new HashSet<Tile>();
+      influenceTiles.addAll(ants.getTiles(antLoc, ants.getAggressionOffsets()));
+      
+      Tile aimLoc = ants.getTile(antLoc, aim);
+      influenceTiles.removeAll(ants.getTiles(antLoc, ants.getAttackOffsets()));
+      influenceTiles.removeAll(waterTiles);
+      
+      for (Tile influenceTile : influenceTiles) {
+        occupied[owner][influenceTile.getRow()][influenceTile.getCol()] -= 1;
+        if (occupied[owner][influenceTile.getRow()][influenceTile.getCol()] == 0) {
+          total[influenceTile.getRow()][influenceTile.getCol()] -= 1;
+          influence[owner][influenceTile.getRow()][influenceTile.getCol()] -= 1;
+        }
+      }
+      
+      for (int o = 0; o < players; o++) {
+        for (Tile influenceTile : influenceTiles) {
+          enemies[o][influenceTile.getRow()][influenceTile.getCol()] = total[influenceTile.getRow()][influenceTile.getCol()] - influence[o][influenceTile.getRow()][influenceTile.getCol()];
+        }
+      }
+      
+      for (Map.Entry<Tile,Integer> entry : ants.getAnts().entrySet()) {
+        Tile antLoc2 = entry.getKey();
+        int owner2 = entry.getValue();
+        
+        for (Aim aim2 : aims) {
+          Tile aimLoc2 = ants.getTile(antLoc2, aim2);
+          if (waterTiles.contains(aimLoc2)) { continue; }
+          if (!influenceTiles.contains(aimLoc2)) { continue; }
+          
+          calculateStatus(aimLoc2, owner2);
+        }
+      }
+    }
+    
+    private void initInfluence() {
+      for (Map.Entry<Tile,Integer> entry : ants.getAnts().entrySet()) {
+        Tile antLoc = entry.getKey();
+        int owner = entry.getValue();
+        
+        Set<Tile> influenceTiles = new HashSet<Tile>();
+        for (Aim aim : aims) {
+          Tile aimLoc = ants.getTile(antLoc, aim);
+
+          if (waterTiles.contains(aimLoc)) { continue; }
+          
+          occupied[owner][aimLoc.getRow()][aimLoc.getCol()] += 1;
+          if (occupied[owner][aimLoc.getRow()][aimLoc.getCol()] > 1) { continue; }
+          
+          influenceTiles.addAll(ants.getTiles(aimLoc, ants.getAttackOffsets()));
+        }
+
+        for (Tile influenceTile : influenceTiles) {
+          total[influenceTile.getRow()][influenceTile.getCol()] += 1;
+          influence[owner][influenceTile.getRow()][influenceTile.getCol()] += 1;
+        }
+      }
+      
+      for (int o = 0; o < players; o++) {
+        for (int r = 0; r < rows; r++) {
+          for (int c = 0; c < cols; c++) {
+            enemies[o][r][c] = total[r][c] - influence[o][r][c];
+          }
+        }
+      }
+
+      for (Map.Entry<Tile,Integer> entry : ants.getAnts().entrySet()) {
+        Tile antLoc = entry.getKey();
+        int owner = entry.getValue();
+        
+        for (Aim aim : aims) {
+          Tile aimLoc = ants.getTile(antLoc, aim);
+          if (waterTiles.contains(aimLoc)) { continue; }
+         
+          calculateStatus(aimLoc, owner);
+        }
+      }
+    }
+
+    private void calculateStatus(Tile antLoc, int owner) {
+      status[owner][antLoc.getRow()][antLoc.getCol()] = 0;
+      
+      for (int o = 0; o < players; o++) {
+        if (owner == o) { continue; }
+
+        int minEnemies = Integer.MAX_VALUE;
+        for (Tile offset : ants.getAttackOffsets()) {
+          Tile loc = ants.getTile(antLoc, offset);
+          if (waterTiles.contains(loc)) { continue; }
+          if (enemies[o][loc.getRow()][loc.getCol()] == 0) { continue; }
+          
+          minEnemies = Math.min(minEnemies, enemies[o][loc.getRow()][loc.getCol()]);
+        }
+        
+        if (enemies[owner][antLoc.getRow()][antLoc.getCol()] == 0) { 
+          status[owner][antLoc.getRow()][antLoc.getCol()] = Math.max(status[owner][antLoc.getRow()][antLoc.getCol()], 0);
+        } else if (enemies[owner][antLoc.getRow()][antLoc.getCol()] < minEnemies) {
+          status[owner][antLoc.getRow()][antLoc.getCol()] = Math.max(status[owner][antLoc.getRow()][antLoc.getCol()], 1);
+        } else if (enemies[owner][antLoc.getRow()][antLoc.getCol()] == minEnemies) {
+          status[owner][antLoc.getRow()][antLoc.getCol()] = Math.max(status[owner][antLoc.getRow()][antLoc.getCol()], 2);
+        } else {
+          status[owner][antLoc.getRow()][antLoc.getCol()] = Math.max(status[owner][antLoc.getRow()][antLoc.getCol()], 3);
+          break;
+        }
+      }
+    }
   }
 
   class Squares {
@@ -538,12 +796,12 @@ public class MyBot extends Bot {
     }
     
     public List<AimValue> getDirectionsFor(final Tile tile) {
-      if (ants.getMyHills().size() > 0) {
-        // if (enemyHills.size() > 0 && ((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
-        //   return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
-        // } else {
+      if (enemyHills.size() > 0) {
+        if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts)) {
+          return attackAnts.contains(tile) ? getDirections(superAttackAgents, tile, -1) : getDirections(superExploreAgents, tile, -1);
+        } else {
           return attackAnts.contains(tile) ? getDirections(attackAgents, tile, -1) : getDirections(exploreAgents, tile, -1);
-        // }
+        }
       } else {
         return getDirections(exploreAgents, tile, -1);
       }
@@ -566,10 +824,6 @@ public class MyBot extends Bot {
         Collections.sort(values, Collections.reverseOrder());
       }
       return values;
-    }
-
-    public boolean hasBeenSeen(final Tile tile) {
-      return squares[tile.getRow()][tile.getCol()].seenOnTurn != -1;
     }
 
     // public List<AimValue> getProbabilisticDirections(final Agent agent, final Tile tile, final int ascending) {
@@ -620,7 +874,7 @@ public class MyBot extends Bot {
     random = new Random(1);
     squares = new Squares(rows, cols);
     
-    maxExploreAnts = (int) (rows * cols / viewRadius2 / 2.6);
+    maxExploreAnts = (int) (rows * cols / viewRadius2 / 3);
     logFine("maxExploreAnts: " + maxExploreAnts);
   }
   
@@ -729,7 +983,8 @@ public class MyBot extends Bot {
       if (tmpOrders.containsValue(route.getStart())) { continue; }
 
       Aim aim = route.getDirections().size() == 1 ? null : route.getDirections().get(0);
-      if (moveDirection(route.getStart(), aim, tmpOrders)) {
+      if (!combat.willDie(route.getStart(), 0, aim) && moveDirection(route.getStart(), aim, tmpOrders)) {
+        combat.move(route.getStart(), 0, aim);
         antsOnTarget.add(route.getEnd());
         // logFiner(route.getStart() + " -> " + route.getEnd() + " FOOD " + aim);
       }
@@ -840,9 +1095,42 @@ public class MyBot extends Bot {
       }
     }
 
+    Set<Tile> killAnts = new HashSet<Tile>();
+    for (Tile antLoc : ants.getMyAnts()) {
+      if (tmpOrders.containsValue(antLoc)) { continue; }
+    
+      List<Aim> killDirections = combat.getKillDirections(antLoc, 0);
+      if (killDirections.size() == 0) { continue; }
+      if (killDirections.size() == 1) {
+        Aim aim = killDirections.get(0);
+        if (moveDirection(antLoc, aim, tmpOrders)) {
+          logFiner(antLoc + " --> " + aim + " single kill direction");
+          combat.move(antLoc, 0, aim);
+        }
+        continue;
+      }
+    
+      killAnts.add(antLoc);
+    }
+    
+    for (Tile antLoc : killAnts) {
+      List<Aim> killDirections = combat.getKillDirections(antLoc, 0);
+      if (killDirections.size() == 0) { continue; }
+    
+      List<AimValue> directions = squares.getDirectionsFor(antLoc);
+      for (AimValue aimValue : directions) {
+        if (killDirections.contains(aimValue.aim)) {
+          if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+            logFiner(antLoc + " --> " + aimValue.aim + " kill direction");
+            combat.move(antLoc, 0, aimValue.aim);
+            break;
+          }
+        }
+      }
+    }
+          
     moveFoodAnts(tmpOrders);
     
-    // Try to move ants towards highest explore goals.
     for (Tile antLoc : ants.getMyAnts()) {
       if (tmpOrders.containsValue(antLoc)) { continue; }
       
@@ -856,13 +1144,15 @@ public class MyBot extends Bot {
       }
       
       List<AimValue> directions = squares.getDirectionsFor(antLoc);
-      antsDirections.put(antLoc, directions);
-      
       // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
+
+
       while (directions.size() > 0) {
-        AimValue aimValue = directions.remove(0);
+        AimValue aimValue = combat.getDirection(antLoc, 0, directions, kamikazeAnts.contains(antLoc));
+        directions.remove(aimValue);
                 
         if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+          combat.move(antLoc, 0, aimValue.aim);
           // logFiner(" -> " + aimValue.aim);
           break;
         }
@@ -881,67 +1171,64 @@ public class MyBot extends Bot {
       }
     }
 
-    Map<Tile,Integer> tmpAnts = new HashMap<Tile,Integer>(ants.getAnts());
-    for (Map.Entry<Tile,Tile> entry: tmpOrders.entrySet()) {
-      tmpAnts.remove(entry.getValue());
-      tmpAnts.put(entry.getKey(), 0);
-    }
-    CombatValues combatValues = new CombatValues(tmpAnts);
-
     // Prevent ants from dying.
-    while (tmpOrders.size() > 0) {
-      Tile origAntLoc = null;
-      Tile prevAntLoc = null;
-
-      for (Iterator<Map.Entry<Tile,Tile>> it = tmpOrders.entrySet().iterator(); it.hasNext(); ) {
-        Map.Entry<Tile,Tile> tmpOrder = it.next();
-        Tile newLoc = tmpOrder.getKey();
-        Tile oldLoc = tmpOrder.getValue();
-
-        if (orders.containsValue(oldLoc)) { continue; } // skip real orders
-        
-        if (combatValues.willDie(newLoc, kamikazeAnts.contains(oldLoc))) {
-          origAntLoc = oldLoc;
-          prevAntLoc = newLoc;
-          
-          it.remove();
-          // logFiner(oldLoc + " ->  " + newLoc + " will die");
-          break;
-        }
-      }
-
-      if (origAntLoc == null) { break; }
-
-      List<AimValue> directions = antsDirections.get(origAntLoc);
-      if (directions == null) {
-        directions = squares.getDirectionsFor(origAntLoc);
-        antsDirections.put(origAntLoc, directions);
-      }
-      // logFiner(origAntLoc + " " + directions);
-      
-      while (directions.size() > 0) {
-        AimValue aimValue = directions.remove(0);
-
-        if (moveDirection(origAntLoc, aimValue.aim, tmpOrders)) {
-          Tile nextAntLoc = aimValue.aim == null ? origAntLoc : ants.getTile(origAntLoc, aimValue.aim);
-          combatValues.move(prevAntLoc, nextAntLoc);
-          
-          // logFiner(" -> " + aimValue.aim);
-          break;
-        }
-      }
-      
-      // to -> from
-      if (!tmpOrders.containsValue(origAntLoc)) { // haven't moved antLoc
-        Tile lastOrigAntLoc = null;
-        while (origAntLoc != null) {
-          lastOrigAntLoc = origAntLoc;
-          orders.put(origAntLoc, origAntLoc);
-          origAntLoc = tmpOrders.put(origAntLoc, origAntLoc); // move antLoc onto itself .. is there another ant?
-        }
-        combatValues.move(prevAntLoc, lastOrigAntLoc);
-      }
-    }
+    // while (tmpOrders.size() > 0) {
+    //   Tile antLoc = null;
+    // 
+    //   Map<Tile,Integer> tmpAnts = new HashMap<Tile,Integer>(ants.getAnts());
+    //   for (Map.Entry<Tile,Tile> entry: tmpOrders.entrySet()) {
+    //     tmpAnts.remove(entry.getValue());
+    //     tmpAnts.put(entry.getKey(), 0);
+    //   }
+    //   CombatValues combatValues = new CombatValues(tmpAnts);
+    //   for (Iterator<Map.Entry<Tile,Tile>> it = tmpOrders.entrySet().iterator(); it.hasNext(); ) {
+    //     Map.Entry<Tile,Tile> tmpOrder = it.next();
+    //     Tile newLoc = tmpOrder.getKey();
+    //     Tile oldLoc = tmpOrder.getValue();
+    // 
+    //     if (orders.containsValue(oldLoc)) { continue; } // skip real orders
+    //     
+    //     boolean newWillDie = combat.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc));
+    //     boolean oldWillDie = combatValues.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc));
+    //     if (newWillDie != oldWillDie) {
+    //       logFiner(newLoc + " will die old: " + oldWillDie + " new: " + newWillDie);
+    //     }
+    //     
+    //     if (newWillDie) {
+    //       antLoc = oldLoc;
+    //       it.remove();
+    //       // logFiner(oldLoc + " ->  " + newLoc + " will die");
+    //       break;
+    //     }
+    //   }
+    // 
+    //   if (antLoc == null) { break; }
+    // 
+    //   List<AimValue> directions = antsDirections.get(antLoc);
+    //   if (directions == null) {
+    //     directions = squares.getDirectionsFor(antLoc);
+    //     antsDirections.put(antLoc, directions);
+    //   }
+    //   // logFiner(antLoc + " " + directions);
+    //   
+    //   for (Iterator<AimValue> it =  directions.iterator(); it.hasNext(); ) {
+    //     AimValue aimValue = it.next();
+    //     it.remove();
+    // 
+    //     if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+    //       // logFiner(" -> " + aimValue.aim);
+    //       break;
+    //     }
+    //   }
+    //   
+    //   // to -> from
+    //   if (!tmpOrders.containsValue(antLoc)) { // haven't moved antLoc
+    //     while (antLoc != null) {
+    //       orders.put(antLoc, antLoc);
+    //       antLoc = tmpOrders.put(antLoc, antLoc); // move antLoc onto itself .. is there another ant?
+    //     }
+    //   }
+    // }
     
     orders = tmpOrders;
   }
@@ -986,43 +1273,37 @@ public class MyBot extends Bot {
       }
     }
 
-    // boolean enemyHillDiscovered = enemyHillsLastTurn == 0 && enemyHills.size() > 0;
-    // boolean enemyHillDied       = enemyDeadHillsLastTurn < enemyDeadHills.size();
-    // enemyHillsLastTurn = enemyHills.size();
-    // enemyDeadHillsLastTurn = enemyDeadHills.size();
-    // 
-    // if (enemyHillDied) {
-    //   // logFiner("enemy hill died or discovered");
-    //   squares.clear(new Agent[] { Agent.ENEMY_HILLS });
-    //   
-    //   // if (enemyHills.size() > 0) {
-    //   //   accelerateAttackDiffusion = 5;
-    //   // }
-    // }
-
-    // if (accelerateAttackDiffusion > 0) {
-    //   for (int i = 0; i < 100; i++) {
-    //     squares.influence(Agent.ENEMY_HILLS);
-    //   }
-    //   // logFiner(">>>>>> attack");
-    //   // squares.printRaw(attackAgents);
-    //   // 
-    //   // logFiner(">>>>>> super attack");
-    //   // squares.printRaw(superAttackAgents);
-    //   
-    //   accelerateAttackDiffusion--;
-    // }
-    // if (enemyHills.size() > 0 && turn > 10) {
-      for (int i = 0; i < 50; i++) {
-        squares.influence(Agent.ENEMY_HILLS);
-      }
-    // }
+    for (int i = 0; i < 25; i++) {
+      squares.influence(Agent.ATTACK);
+    }
     
     //squares.printRaw(attackAgents);
   }
   
+  Combat combat;
   public void doTurn() {
     long t0;
+    
+    t0 = System.currentTimeMillis();
+    
+    int maxOwner = 0;
+    for (Integer owner : ants.getAnts().values()) {
+      maxOwner = Math.max(maxOwner, owner);
+    }
+    
+    combat = new Combat(maxOwner + 1, ants.getRows(), ants.getCols());
+    logFine("combat: " + (System.currentTimeMillis() - t0));
+
+    // System.err.println("----- influence 0");
+    // combat.printInfluence(0);
+    // System.err.println("----- total");
+    // combat.printTotal();
+    // System.err.println("----- enemies 2");
+    // combat.printEnemies(2);
+    // System.err.println("----- status 0");
+    // combat.printStatus(0);
+    // System.err.println("----- status 2");
+    // combat.printStatus(2);
 
     t0 = System.currentTimeMillis();
     diffuse();
@@ -1105,7 +1386,6 @@ public class MyBot extends Bot {
           if (closedSet.contains(y))         { continue; }
           if (waterTiles.contains(y))        { continue; }
           if (ants.getMyHills().contains(y)) { continue; }
-          if (!squares.hasBeenSeen(y))       { continue; }
 
           // System.err.println("considering: " + y);
           float distance = 1.0f;
