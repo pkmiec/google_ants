@@ -37,6 +37,7 @@ public class MyBot extends Bot {
   Map<Tile, Set<Tile>> combatAnts = null;
   
   Map<Tile,Integer> stillAnts = new HashMap<Tile,Integer>();
+  Set<Tile> bandedEnemyAnts;
   
   enum Agent {
     EXPLORE,
@@ -475,9 +476,6 @@ public class MyBot extends Bot {
               setInitValue(agent, Math.min(80, 40 + ((turn - seenOnTurn) * 2)));
             }
           } else {
-            // if (ants.getEnemyAnts().contains(this)) {
-            //   setInitValue(agent, 25);
-            // } else 
             if (ants.getMyAnts().contains(this)) {
               if (!combatAnts.containsKey(this)) {
                 setInitValue(agent, 0);
@@ -487,10 +485,16 @@ public class MyBot extends Bot {
           }
           break;
         case ATTACK:
-          if (enemyHills.contains(this)) {
-            setInitValue(agent, 100);
-          } else if (ants.getMyHills().contains(this)) {
-            setInitValue(agent, 0);
+          if (enemyHills.size() == 0) {
+            if (seenOnTurn == -1) {
+              setInitValue(agent, 100);
+            }
+          } else {
+            if (enemyHills.contains(this)) {
+              setInitValue(agent, 100);
+            } else if (ants.getMyHills().contains(this)) {
+              setInitValue(agent, 0);
+            }
           }
           break;
         case ENEMY_ANTS:
@@ -501,72 +505,44 @@ public class MyBot extends Bot {
           // .a.  .?.  .?.  .?.  
           // ?x?  ax?  ?xa  ?x?
           // .?.  .?.  .?.  .a.
-          
-          // blockage detection
-          // ???  .??  .x.  ??.
-          // ???  x??  ???  ??x
-          // .x.  .??  ???  ??.
-          
-          if (!ants.getEnemyAnts().contains(this)) {
-            if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))) {
-              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) {
-                Tile westTile = ants.getTile(this, Aim.WEST);
-                if (ants.getEnemyAnts().contains(ants.getTile(westTile, Aim.NORTH)) 
-                    || ants.getEnemyAnts().contains(ants.getTile(westTile, Aim.SOUTH))) {
-                  setInitValue(agent, -40);
-                } else {
-                  setInitValue(agent, 80);
-                }
-              } else {
-                setInitValue(agent, -40);
-              }
-            } else if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))) {
-              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) { 
-                Tile eastTile = ants.getTile(this, Aim.EAST);
-                if (ants.getEnemyAnts().contains(ants.getTile(eastTile, Aim.NORTH)) 
-                   || ants.getEnemyAnts().contains(ants.getTile(eastTile, Aim.SOUTH))) {
-                  setInitValue(agent, -40);
-                } else {
-                  setInitValue(agent, 80);
-                }
-              } else {
-                setInitValue(agent, -40);
-              }
-            } else if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))) {
-              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) {
-                Tile northTile = ants.getTile(this, Aim.NORTH);
-                if (ants.getEnemyAnts().contains(ants.getTile(northTile, Aim.WEST)) 
-                    || ants.getEnemyAnts().contains(ants.getTile(northTile, Aim.EAST))) {
-                  setInitValue(agent, -40);
-                } else {
-                  setInitValue(agent, 80);
+          if (enemyHills.contains(this)) {
+            setInitValue(agent, 100);
+          } else if (!ants.getEnemyAnts().contains(this)) {
+            for (Aim aim : Aim.values()) {
+              Tile aimLoc = ants.getTile(this, aim);
+              if (ants.getEnemyAnts().contains(aimLoc)) {
+                if (bandedEnemyAnts.contains(aimLoc)) {
+                  boolean otherAnt = false;
+                  for (Aim otherAim : aim.others()) {
+                    Tile otherAimLoc = ants.getTile(this, otherAim);
+                    if (ants.getEnemyAnts().contains(otherAimLoc)) {
+                      otherAnt = true;
+                      break;
+                    }
+                  }
                 
-                }
-              } else {
-                setInitValue(agent, -40);
-              }
-            } else if (ants.getEnemyAnts().contains(ants.getTile(this, Aim.SOUTH))) {
-              if (!ants.getEnemyAnts().contains(ants.getTile(this, Aim.EAST))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.NORTH))
-                  && !ants.getEnemyAnts().contains(ants.getTile(this, Aim.WEST))) {
-                Tile southTile = ants.getTile(this, Aim.SOUTH);
-                if (ants.getEnemyAnts().contains(ants.getTile(southTile, Aim.WEST)) 
-                   || ants.getEnemyAnts().contains(ants.getTile(southTile, Aim.EAST))) {
-                  setInitValue(agent, -40);
+                  if (otherAnt) {
+                    setInitValue(agent, -40);
+                  } else {
+                    boolean sidewaysAnt = false;
+                    for (Aim sidewaysAim : aim.sideways()) {
+                      Tile sidewaysAimLoc = ants.getTile(aimLoc, sidewaysAim);
+                      if (ants.getEnemyAnts().contains(sidewaysAimLoc)) {
+                        sidewaysAnt = true;
+                        break;
+                      }
+                    }
+                  
+                    if (sidewaysAnt) {
+                      setInitValue(agent, -40);
+                    } else {
+                      setInitValue(agent, 80);
+                    }
+                  }
                 } else {
-                  setInitValue(agent, 80);
+                  setInitValue(agent, 120);
                 }
-              } else {
-                setInitValue(agent, -40);
               }
-            } else if (enemyHills.contains(this)) {
-              setInitValue(agent, 100);
             }
           }
           break;
@@ -606,10 +582,16 @@ public class MyBot extends Bot {
       }
     }
 
+    public boolean hasInitValue(final Agent agent) {
+      return initValues[agent.ordinal()];
+    }
+
     private void setInitValue(final Agent agent, final double value) {
       values[agent.ordinal()]     = value;
       initValues[agent.ordinal()] = true;
     }
+    
+    
   }
 
   Map<Tile,Set<Tile>> antsHoards; 
@@ -891,7 +873,7 @@ public class MyBot extends Bot {
       for (int r = 0; r < rows ; r++) {
         for (int c = 0; c < cols; c++) {
           double maxValue = 0.0;
-          if (shouldDiffuse(squares[r][c])) {
+          if (!squares[r][c].hasInitValue(agent) && shouldDiffuse(squares[r][c])) {
             if (shouldDiffuse(squares[(rows + r - 1) % rows][c])) {
               maxValue = Math.max(maxValue, squares[(rows + r - 1) % rows][c].getValue(agent));
             }
@@ -931,7 +913,7 @@ public class MyBot extends Bot {
         for (int c = 0; c < cols; c++) {
           double sum = 0.0;
           double sides = 0;
-          if (shouldDiffuse(squares[r][c])) {
+          if (!squares[r][c].hasInitValue(agent) && shouldDiffuse(squares[r][c])) {
             if (shouldDiffuse(squares[(rows + r - 1) % rows][c])) {
               sum = sum + squares[(rows + r - 1) % rows][c].getValue(agent);
               sides++;
@@ -1144,6 +1126,20 @@ public class MyBot extends Bot {
     }
 
     antsHoards = new HashMap<Tile,Set<Tile>>();
+
+    bandedEnemyAnts = new HashSet<Tile>();
+    for (Tile enemyAnt : ants.getEnemyAnts()) {
+      if (bandedEnemyAnts.contains(enemyAnt)) { continue; }
+
+      for (Tile loc : ants.getTiles(enemyAnt, ants.getAggressionOffsets())) {
+        if (enemyAnt == loc) { continue; }
+        if (ants.getEnemyAnts().contains(loc)) { 
+          bandedEnemyAnts.add(enemyAnt);
+          bandedEnemyAnts.add(loc);
+          break;
+        }
+      }
+    }
 
     logFine("afterUpdate: " + (System.currentTimeMillis() - t0));
   }

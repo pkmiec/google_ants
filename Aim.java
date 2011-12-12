@@ -35,6 +35,8 @@ public enum Aim {
     private Aim opposite;
     
     private Aim[] sideways;
+
+    private Aim[] others;
     
     Aim(int rowDelta, int colDelta, char symbol) {
         this.rowDelta = rowDelta;
@@ -104,6 +106,21 @@ public enum Aim {
         } 
       }
       return sideways;
+    }
+
+    public Aim[] others() {
+      if (others == null) {
+        if (this == Aim.NORTH) {
+          others = new Aim[] { Aim.SOUTH, Aim.WEST, Aim.EAST };
+        } else if (this == Aim.SOUTH) {
+          others = new Aim[] { Aim.NORTH, Aim.WEST, Aim.EAST };
+        } else if (this == Aim.WEST) {
+          others = new Aim[] { Aim.NORTH, Aim.SOUTH, Aim.EAST };
+        } else if (this == Aim.EAST) {
+          others = new Aim[] { Aim.NORTH, Aim.WEST, Aim.SOUTH };
+        } 
+      }
+      return others;
     }
     
 }
