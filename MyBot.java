@@ -1170,6 +1170,14 @@ public class MyBot extends Bot {
     }
   }
 
+  public boolean isWithinDistanceOf(Tile loc, int radius2, Collection<Tile> targets) {
+    for (Tile target : targets) {
+      if (ants.getDistance(loc, target) <= radius2) { return true; }
+    }
+
+    return false;
+  }
+
   public void moveAntsOnTargets(Set<Tile> targets, int maxDistance, Map<Tile,Tile> tmpOrders) {
     PriorityQueue<Route> possibleRoutes = new PriorityQueue<Route>();
     Set<Tile> antsOnTarget = new HashSet<Tile>();
@@ -1180,6 +1188,7 @@ public class MyBot extends Bot {
       
       for (Tile antLoc : ants.getMyAnts()) {
         if (tmpOrders.containsValue(antLoc)) { continue; }
+        if (isWithinDistanceOf(antLoc, ants.getAggressionRadius2(), enemyHills)) { continue; }
 
         List<Aim> directions = new Router(antLoc, foodLoc).directions(maxDistance);
         if (directions != null) {

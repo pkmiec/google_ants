@@ -23,6 +23,8 @@ public class Ants {
 
     private final int attackRadius2;
     private final Set<Tile> attackOffsets;
+    
+    private final int aggressionRadius2;
     private final Set<Tile> aggressionOffsets;
 
     private final int spawnRadius2;
@@ -97,7 +99,7 @@ public class Ants {
         }
         // System.err.println("attack: " + attackOffsets);
         
-        double aggressionRadius2 = Math.pow((Math.sqrt(attackRadius2) + 1), 2);
+        aggressionRadius2 = (int) Math.pow((Math.sqrt(attackRadius2) + 1), 2);
         aggressionOffsets = new HashSet<Tile>();
         mx = (int)Math.sqrt(aggressionRadius2);
         for (int row = -mx; row <= mx; ++row) {
@@ -176,6 +178,10 @@ public class Ants {
      */
     public int getAttackRadius2() {
         return attackRadius2;
+    }
+
+    public int getAggressionRadius2() {
+        return aggressionRadius2;
     }
 
     public Set<Tile> getAttackOffsets() {
