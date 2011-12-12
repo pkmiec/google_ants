@@ -239,7 +239,9 @@ public class MyBot extends Bot {
         }
         
         if (numWaysMyAntDies >= 1) { return true; }
-        if (numWaysBothAntDie >= 1 && numWaysEnemyAntDies == 0 && !kamikaze) { return true; }
+        if (!kamikaze) {
+          if (numWaysBothAntDie >= (numWaysEnemyAntDies + numWaysNeitherAntDie)) { return true; }
+        }
       }
   
       return false;
@@ -336,7 +338,7 @@ public class MyBot extends Bot {
       
       // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
       while (directions.size() > 0) {
-        if (directions.size() > 1 && directions.get(0).aim == null) {
+        if (directions.size() > 3 && directions.get(0).aim == null) {
           directions.add(directions.remove(0));
           // logFiner(antLoc + " replacing null with " + directions.get(0).aim);
         }
@@ -453,6 +455,12 @@ public class MyBot extends Bot {
       this.seenOnTurn = -1;
 
       setValue(Agent.values(), 0.0);
+    }
+
+    public void initValue(final Agent[] agents) {
+      for (Agent agent : agents) {
+        initValue(agent);
+      }
     }
 
     public void initValue(Agent agent) {
@@ -863,13 +871,15 @@ public class MyBot extends Bot {
       }
     }
 
-    public void influence(Agent agent) {
+    public void initValues(final Agent[] agents) {
       for (int r = 0; r < rows ; r++) {
         for (int c = 0; c < cols; c++) {
-          squares[r][c].initValue(agent);
+          squares[r][c].initValue(agents);
         }
       }
+    }
 
+    public void influence(Agent agent) {
       for (int r = 0; r < rows ; r++) {
         for (int c = 0; c < cols; c++) {
           double maxValue = 0.0;
@@ -901,14 +911,6 @@ public class MyBot extends Bot {
     }
 
     public void diffuse(Agent agent) {
-      // long t0 = System.currentTimeMillis();
-
-      for (int r = 0; r < rows ; r++) {
-        for (int c = 0; c < cols; c++) {
-          squares[r][c].initValue(agent);
-        }
-      }
-      
       for (int r = 0; r < rows ; r++) {
         for (int c = 0; c < cols; c++) {
           double sum = 0.0;
@@ -944,7 +946,6 @@ public class MyBot extends Bot {
           squares[r][c].setValue(agent, tmpValues[r][c]);
         }
       }
-      // System.err.println("diffusion time: " + (System.currentTimeMillis() - t0));
     }
     
     private boolean shouldDiffuse(Square square) {
@@ -1433,6 +1434,7 @@ public class MyBot extends Bot {
 
   public void diffuse() {
     squares.clear(new Agent[] { Agent.ENEMY_ANTS, Agent.DEFEND });
+    squares.initValues(Agent.values());
 
     boolean hillsUnderAttack = false;
     for (Tile myHill: ants.getMyHills()) {
