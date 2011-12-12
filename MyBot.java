@@ -95,109 +95,351 @@ public class MyBot extends Bot {
     }
   }
 
+  // class CombatValues {
+  //   final Map<Tile, Integer> tilesAttackers;
+  //   final Map<Tile, Integer> tilesDefenders;
+  //   final Map<Tile, Integer> antsOwners;
+  //   
+  //   public CombatValues() {
+  //     this(ants.getAnts());
+  //   }
+  //   
+  //   public CombatValues(Map<Tile,Integer> antsOwners) {
+  //     this.tilesAttackers = new HashMap<Tile, Integer>();
+  //     this.tilesDefenders = new HashMap<Tile, Integer>();
+  //     this.antsOwners = antsOwners;
+  //   }
+  //   
+  //   public int getTileAttackers(Tile tile, int owner, Set<Tile> offsets) {
+  //     if (tilesAttackers.containsKey(tile)) {
+  //       return tilesAttackers.get(tile);
+  //     }
+  //     
+  //     int tileAttackers = 0;
+  //     for (Tile offset : offsets) {
+  //       Tile loc = ants.getTile(tile, offset);
+  //       Integer locOwner = antsOwners.get(loc);
+  //           
+  //       if (locOwner != null && locOwner != owner) {
+  // 
+  //         // An ant is only an attacker if it is in attack radius or can move into attack radius in one 
+  //         // move (i.e. it is not blocked by water). This should allow me to sometimes attack through 
+  //         // water.
+  //         if (ants.getAttackOffsets().contains(offset) || canAntMoveToAttackTargetAnt(loc, tile)) {
+  //           tileAttackers++;
+  //         }
+  //       }
+  //     }
+  //     tilesAttackers.put(tile, tileAttackers);
+  //     return tileAttackers;
+  //   }
+  // 
+  //   private boolean canAntMoveToAttackTargetAnt(Tile ant, Tile targetAnt) {
+  //     Set<Tile> attackTiles = ants.getTiles(targetAnt, ants.getAttackOffsets());
+  //     
+  //     for (Aim aim: Aim.values()) {
+  //       Tile loc = ants.getTile(ant, aim);
+  //       if (attackTiles.contains(loc) && !waterTiles.contains(loc)) {
+  //         return true;
+  //       }
+  //     }
+  // 
+  //     // logFiner(ant + " cannot move to attack " + targetAnt);
+  //     return false;
+  //   }
+  // 
+  //   public int getTileDefenders(Tile tile, int owner, Set<Tile> offsets) {
+  //     if (tilesDefenders.containsKey(tile)) {
+  //       return tilesDefenders.get(tile);
+  //     }
+  //     
+  //     int tileDefenders = 0;
+  //     for (Tile offset : offsets) {
+  //       Tile loc = ants.getTile(tile, offset);
+  //       Integer locOwner = antsOwners.get(loc);
+  //     
+  //       if (locOwner != null && locOwner == owner) {
+  //         tileDefenders++;
+  //       }
+  //     }
+  //     tilesDefenders.put(tile, tileDefenders);
+  //     return tileDefenders;
+  //   }
+  // 
+  //   //
+  //   //
+  //   //
+  //   //
+  //   public boolean willDie(Tile tile, int owner) {
+  //     return willDie(tile, owner, false);
+  //   }
+  //   
+  //   public boolean willDie(Tile tile, int owner, boolean kamikaze) {
+  //     int myAttackers = getTileAttackers(tile, owner, ants.getAggressionOffsets()); // ants attacking me
+  //     int difference = myAttackers;
+  // 
+  //     if (myAttackers == 0) { return false; }
+  //     
+  //     for (Tile offset : ants.getAggressionOffsets()) {
+  //       Tile loc = ants.getTile(tile, offset);
+  //       Integer locOwner = antsOwners.get(loc);
+  //   
+  //       if (locOwner != null && locOwner != owner) {
+  //         int locAttackers = getTileAttackers(loc, locOwner, ants.getAggressionOffsets()); // ants attacking them
+  //         // logFinest("attacking difference: " + myAttackers + " " + locAttackers);
+  //         if (kamikaze) {
+  //           if (myAttackers > locAttackers) { return true; }
+  //         } else {
+  //           if (myAttackers >= locAttackers) { return true; }
+  //         }
+  //       }
+  //     }
+  //     
+  //     return false;
+  //   }
+  //   
+  // }
+
   class CombatValues {
-    final Map<Tile, Integer> tilesAttackers;
-    final Map<Tile, Integer> tilesDefenders;
     final Map<Tile, Integer> antsOwners;
+    final Map<Tile, List<AimAttackers>> enemyChoices;
+    final Map<Tile, Set<Tile>> myPotentialAttackers;
     
     public CombatValues() {
       this(ants.getAnts());
     }
     
     public CombatValues(Map<Tile,Integer> antsOwners) {
-      this.tilesAttackers = new HashMap<Tile, Integer>();
-      this.tilesDefenders = new HashMap<Tile, Integer>();
       this.antsOwners = antsOwners;
+      this.enemyChoices = new HashMap<Tile, List<AimAttackers>>();
+      this.myPotentialAttackers = new HashMap<Tile, Set<Tile>>();
+      
+      for (Tile antLoc: antsOwners.keySet()) {
+        if (antsOwners.get(antLoc) != 0) { continue; }
+        
+        Set<Tile> potentialAttackers = getPotentialAttackers(antLoc, 0);
+        if (potentialAttackers.size() == 0) { continue; }
+                
+        for (Tile enemyLoc : potentialAttackers) {
+          List<AimAttackers> choices = enemyChoices.get(enemyLoc);
+          if (choices != null) { continue; }
+          
+          choices = getEnemyChoices(enemyLoc, antsOwners.get(enemyLoc));
+          // logFinest(enemyLoc + " choices: " + choices);
+          enemyChoices.put(enemyLoc, choices);
+        }
+        
+        myPotentialAttackers.put(antLoc, potentialAttackers);
+        // logFinest(antLoc + " potential attackers " + potentialAttackers);
+      }
     }
     
-    public int getTileAttackers(Tile tile, int owner, Set<Tile> offsets) {
-      if (tilesAttackers.containsKey(tile)) {
-        return tilesAttackers.get(tile);
+    public boolean willDie(Tile antLoc, int owner, boolean kamikaze) {
+      Set<Tile> potentialAttackers = myPotentialAttackers.get(antLoc);
+      if (potentialAttackers == null || potentialAttackers.size() == 0) { return false; }
+  
+      for (Tile potentialAttacker: potentialAttackers) {
+        int numWaysMyAntDies     = 0;
+        int numWaysBothAntDie    = 0;
+        int numWaysEnemyAntDies  = 0;
+        int numWaysNeitherAntDie = 0;
+  
+        List<AimAttackers> choices = enemyChoices.get(potentialAttacker);
+        for (AimAttackers choice: choices) {
+          if (choice.attackers.contains(antLoc)) {
+            if (choice.attackers.size() > potentialAttackers.size()) {
+              numWaysEnemyAntDies++;
+            } else if (choice.attackers.size() == potentialAttackers.size()) {
+              numWaysBothAntDie++;
+            } else {
+              numWaysMyAntDies++;
+            }
+          } else {
+            numWaysNeitherAntDie++;
+          }
+        }
+        
+        if (numWaysMyAntDies >= 1) { return true; }
+        if (numWaysBothAntDie >= 1 && numWaysEnemyAntDies == 0 && !kamikaze) { return true; }
       }
+  
+      return false;
+    }
+    
+    public void move(Tile fromLoc, Tile toLoc) {
+      // logFinest("move " + fromLoc + " to " + toLoc);
+      Set<Tile> enemiesToUpdate = new HashSet<Tile>();
+  
+      antsOwners.remove(fromLoc);
+      antsOwners.put(toLoc, 0);
       
-      int tileAttackers = 0;
+      Set<Tile> fromAttackers = myPotentialAttackers.remove(fromLoc);
+      if (fromAttackers != null) { enemiesToUpdate.addAll(fromAttackers); }
+      
+      Set<Tile> toAttackers = getPotentialAttackers(toLoc, 0);
+      if (toAttackers.size() > 0) { 
+        enemiesToUpdate.addAll(toAttackers); 
+        myPotentialAttackers.put(toLoc, toAttackers);
+      }
+  
+      for (Tile enemyToUpdate: enemiesToUpdate) {
+        enemyChoices.put(enemyToUpdate, getEnemyChoices(enemyToUpdate, antsOwners.get(enemyToUpdate)));
+      }
+    }
+        
+    private List<AimAttackers> getEnemyChoices(Tile enemyLoc, int owner) {
+      List<AimAttackers> choices = new ArrayList<AimAttackers>();
+      choices.add(new AimAttackers(null, getActualAttackers(enemyLoc, antsOwners.get(enemyLoc))));
+      for (Aim aim: Aim.values()) {
+        Tile aimLoc = ants.getTile(enemyLoc, aim);
+        if (waterTiles.contains(aimLoc)) { continue; }
+        choices.add(new AimAttackers(aim, getActualAttackers(aimLoc, antsOwners.get(enemyLoc))));
+      }
+      return choices;
+    }
+    
+    private Set<Tile> getActualAttackers(Tile tile, int owner) {
+      return getTileAttackers(tile, owner, ants.getAttackOffsets());
+    }
+    
+    private Set<Tile> getPotentialAttackers(Tile tile, int owner) {
+      return getTileAttackers(tile, owner, ants.getAggressionOffsets());
+    }
+    
+    private Set<Tile> getTileAttackers(Tile tile, int owner, Set<Tile> offsets) {
+      Set<Tile> attackers = new HashSet<Tile>();
+      
       for (Tile offset : offsets) {
         Tile loc = ants.getTile(tile, offset);
         Integer locOwner = antsOwners.get(loc);
             
         if (locOwner != null && locOwner != owner) {
-
-          // An ant is only an attacker if it is in attack radius or can move into attack radius in one 
-          // move (i.e. it is not blocked by water). This should allow me to sometimes attack through 
-          // water.
-          if (ants.getAttackOffsets().contains(offset) || canAntMoveToAttackTargetAnt(loc, tile)) {
-            tileAttackers++;
-          }
+          attackers.add(loc);
         }
       }
-      tilesAttackers.put(tile, tileAttackers);
-      return tileAttackers;
-    }
-
-    private boolean canAntMoveToAttackTargetAnt(Tile ant, Tile targetAnt) {
-      Set<Tile> attackTiles = ants.getTiles(targetAnt, ants.getAttackOffsets());
       
-      for (Aim aim: Aim.values()) {
-        Tile loc = ants.getTile(ant, aim);
-        if (attackTiles.contains(loc) && !waterTiles.contains(loc)) {
-          return true;
-        }
-      }
-
-      // logFiner(ant + " cannot move to attack " + targetAnt);
-      return false;
+      return attackers;
     }
+        
+  }
 
-    public int getTileDefenders(Tile tile, int owner, Set<Tile> offsets) {
-      if (tilesDefenders.containsKey(tile)) {
-        return tilesDefenders.get(tile);
-      }
-      
-      int tileDefenders = 0;
-      for (Tile offset : offsets) {
-        Tile loc = ants.getTile(tile, offset);
-        Integer locOwner = antsOwners.get(loc);
-      
-        if (locOwner != null && locOwner == owner) {
-          tileDefenders++;
-        }
-      }
-      tilesDefenders.put(tile, tileDefenders);
-      return tileDefenders;
-    }
-
-    //
-    //
-    //
-    //
-    public boolean willDie(Tile tile, int owner) {
-      return willDie(tile, owner, false);
-    }
-    
-    public boolean willDie(Tile tile, int owner, boolean kamikaze) {
-      int myAttackers = getTileAttackers(tile, owner, ants.getAggressionOffsets()); // ants attacking me
-      int difference = myAttackers;
+  public void moveAnts() {
+    Map<Tile,Tile> tmpOrders = new HashMap<Tile,Tile>(orders);
+    Map<Tile, List<AimValue>> antsDirections = new HashMap<Tile, List<AimValue>>();
+    Set<Tile> kamikazeAnts = new HashSet<Tile>();
   
-      if (myAttackers == 0) { return false; }
+    for (Tile antLoc : ants.getMyHills()) {
+      if (!ants.getMyAnts().contains(antLoc)) { continue; }
       
-      for (Tile offset : ants.getAggressionOffsets()) {
-        Tile loc = ants.getTile(tile, offset);
-        Integer locOwner = antsOwners.get(loc);
+      if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts) || (ants.getMyAnts().size() / 2 > attackAnts.size())) {
+        attackAnts.add(antLoc);
+      }
+    }
+  
+    moveFoodAnts(tmpOrders);
     
-        if (locOwner != null && locOwner != owner) {
-          int locAttackers = getTileAttackers(loc, locOwner, ants.getAggressionOffsets()); // ants attacking them
-          // logFinest("attacking difference: " + myAttackers + " " + locAttackers);
-          if (kamikaze) {
-            if (myAttackers > locAttackers) { return true; }
-          } else {
-            if (myAttackers >= locAttackers) { return true; }
-          }
+    // Try to move ants towards highest explore goals.
+    for (Tile antLoc : ants.getMyAnts()) {
+      if (tmpOrders.containsValue(antLoc)) { continue; }
+      
+      // For ants close to my hills be more aggressive about attacking enemy ants (even if it means dying) to prevent
+      // a lucky enemy ant from killing my hive.
+      for (Tile myHill: ants.getMyHills()) {
+        if (ants.getDistance(myHill, antLoc) <= ants.getViewRadius2()) {
+          kamikazeAnts.add(antLoc);
+          break;
         }
       }
       
-      return false;
+      List<AimValue> directions = squares.getDirectionsFor(antLoc);
+      antsDirections.put(antLoc, directions);
+      
+      // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
+      while (directions.size() > 0) {
+        if (directions.size() > 1 && directions.get(0).aim == null) {
+          directions.add(directions.remove(0));
+          logFiner(antLoc + " replacing null with " + directions.get(0).aim);
+        }
+
+        AimValue aimValue = directions.remove(0);
+                
+        if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+          // logFiner(" -> " + aimValue.aim);
+          break;
+        }
+      }
+  
+      // to -> from
+      if (!tmpOrders.containsValue(antLoc)) { // haven't moved antLoc
+        while (antLoc != null) {
+          antLoc = tmpOrders.put(antLoc, antLoc); // move antLoc onto itself .. is there another ant?
+        }
+      }
+    }
+  
+    Map<Tile,Integer> tmpAnts = new HashMap<Tile,Integer>(ants.getAnts());
+    for (Map.Entry<Tile,Tile> entry: tmpOrders.entrySet()) {
+      tmpAnts.remove(entry.getValue());
+      tmpAnts.put(entry.getKey(), 0);
+    }
+    CombatValues combatValues = new CombatValues(tmpAnts);
+  
+    // Prevent ants from dying.
+    while (tmpOrders.size() > 0) {
+      Tile origAntLoc = null;
+      Tile prevAntLoc = null;
+  
+      for (Iterator<Map.Entry<Tile,Tile>> it = tmpOrders.entrySet().iterator(); it.hasNext(); ) {
+        Map.Entry<Tile,Tile> tmpOrder = it.next();
+        Tile newLoc = tmpOrder.getKey();
+        Tile oldLoc = tmpOrder.getValue();
+  
+        if (orders.containsValue(oldLoc)) { continue; } // skip real orders
+        
+        if (combatValues.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc))) {
+          origAntLoc = oldLoc;
+          prevAntLoc = newLoc;
+          
+          it.remove();
+          // logFiner(oldLoc + " ->  " + newLoc + " will die");
+          break;
+        }
+      }
+  
+      if (origAntLoc == null) { break; }
+  
+      List<AimValue> directions = antsDirections.get(origAntLoc);
+      if (directions == null) {
+        directions = squares.getDirectionsFor(origAntLoc);
+        antsDirections.put(origAntLoc, directions);
+      }
+      // logFiner(origAntLoc + " " + directions);
+      
+      while (directions.size() > 0) {
+        AimValue aimValue = directions.remove(0);
+  
+        if (moveDirection(origAntLoc, aimValue.aim, tmpOrders)) {
+          Tile nextAntLoc = aimValue.aim == null ? origAntLoc : ants.getTile(origAntLoc, aimValue.aim);
+          combatValues.move(prevAntLoc, nextAntLoc);
+          
+          // logFiner(" -> " + aimValue.aim);
+          break;
+        }
+      }
+      
+      // to -> from
+      if (!tmpOrders.containsValue(origAntLoc)) { // haven't moved antLoc
+        Tile lastOrigAntLoc = null;
+        while (origAntLoc != null) {
+          lastOrigAntLoc = origAntLoc;
+          orders.put(origAntLoc, origAntLoc);
+          origAntLoc = tmpOrders.put(origAntLoc, origAntLoc); // move antLoc onto itself .. is there another ant?
+        }
+        combatValues.move(prevAntLoc, lastOrigAntLoc);
+      }
     }
     
+    orders = tmpOrders;
   }
 
   class AimValue implements Comparable<AimValue> {
@@ -1082,156 +1324,119 @@ public class MyBot extends Bot {
     moveAntsOnTargets(ants.getFoodTiles(), 10, tmpOrders);
   }
 
-  public void moveAnts() {
-    Map<Tile,Tile> tmpOrders = new HashMap<Tile,Tile>(orders);
-    Map<Tile, List<AimValue>> antsDirections = new HashMap<Tile, List<AimValue>>();
-    Set<Tile> kamikazeAnts = new HashSet<Tile>();
-
-    for (Tile antLoc : ants.getMyHills()) {
-      if (!ants.getMyAnts().contains(antLoc)) { continue; }
-      
-      if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts) || (ants.getMyAnts().size() / 2 > attackAnts.size())) {
-        attackAnts.add(antLoc);
-      }
-    }
-
-    Set<Tile> killAnts = new HashSet<Tile>();
-    for (Tile antLoc : ants.getMyAnts()) {
-      if (tmpOrders.containsValue(antLoc)) { continue; }
-    
-      List<Aim> killDirections = combat.getKillDirections(antLoc, 0);
-      if (killDirections.size() == 0) { continue; }
-      if (killDirections.size() == 1) {
-        Aim aim = killDirections.get(0);
-        if (moveDirection(antLoc, aim, tmpOrders)) {
-          logFiner(antLoc + " --> " + aim + " single kill direction");
-          combat.move(antLoc, 0, aim);
-        }
-        continue;
-      }
-    
-      killAnts.add(antLoc);
-    }
-    
-    for (Tile antLoc : killAnts) {
-      List<Aim> killDirections = combat.getKillDirections(antLoc, 0);
-      if (killDirections.size() == 0) { continue; }
-    
-      List<AimValue> directions = squares.getDirectionsFor(antLoc);
-      for (AimValue aimValue : directions) {
-        if (killDirections.contains(aimValue.aim)) {
-          if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
-            logFiner(antLoc + " --> " + aimValue.aim + " kill direction");
-            combat.move(antLoc, 0, aimValue.aim);
-            break;
-          }
-        }
-      }
-    }
-          
-    moveFoodAnts(tmpOrders);
-    
-    for (Tile antLoc : ants.getMyAnts()) {
-      if (tmpOrders.containsValue(antLoc)) { continue; }
-      
-      // For ants close to my hills be more aggressive about attacking enemy ants (even if it means dying) to prevent
-      // a lucky enemy ant from killing my hive.
-      for (Tile myHill: ants.getMyHills()) {
-        if (ants.getDistance(myHill, antLoc) <= ants.getViewRadius2()) {
-          kamikazeAnts.add(antLoc);
-          break;
-        }
-      }
-      
-      List<AimValue> directions = squares.getDirectionsFor(antLoc);
-      // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
-
-
-      while (directions.size() > 0) {
-        AimValue aimValue = combat.getDirection(antLoc, 0, directions, kamikazeAnts.contains(antLoc));
-        directions.remove(aimValue);
-                
-        if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
-          combat.move(antLoc, 0, aimValue.aim);
-          // logFiner(" -> " + aimValue.aim);
-          break;
-        }
-        
-        if (directions.size() > 1 && directions.get(0).aim == null) {
-          directions.add(directions.remove(0));
-          logFiner(antLoc + " replacing null with " + aimValue.aim);
-        }
-      }
-
-      // to -> from
-      if (!tmpOrders.containsValue(antLoc)) { // haven't moved antLoc
-        while (antLoc != null) {
-          antLoc = tmpOrders.put(antLoc, antLoc); // move antLoc onto itself .. is there another ant?
-        }
-      }
-    }
-
-    // Prevent ants from dying.
-    // while (tmpOrders.size() > 0) {
-    //   Tile antLoc = null;
-    // 
-    //   Map<Tile,Integer> tmpAnts = new HashMap<Tile,Integer>(ants.getAnts());
-    //   for (Map.Entry<Tile,Tile> entry: tmpOrders.entrySet()) {
-    //     tmpAnts.remove(entry.getValue());
-    //     tmpAnts.put(entry.getKey(), 0);
-    //   }
-    //   CombatValues combatValues = new CombatValues(tmpAnts);
-    //   for (Iterator<Map.Entry<Tile,Tile>> it = tmpOrders.entrySet().iterator(); it.hasNext(); ) {
-    //     Map.Entry<Tile,Tile> tmpOrder = it.next();
-    //     Tile newLoc = tmpOrder.getKey();
-    //     Tile oldLoc = tmpOrder.getValue();
-    // 
-    //     if (orders.containsValue(oldLoc)) { continue; } // skip real orders
-    //     
-    //     boolean newWillDie = combat.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc));
-    //     boolean oldWillDie = combatValues.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc));
-    //     if (newWillDie != oldWillDie) {
-    //       logFiner(newLoc + " will die old: " + oldWillDie + " new: " + newWillDie);
-    //     }
-    //     
-    //     if (newWillDie) {
-    //       antLoc = oldLoc;
-    //       it.remove();
-    //       // logFiner(oldLoc + " ->  " + newLoc + " will die");
-    //       break;
-    //     }
-    //   }
-    // 
-    //   if (antLoc == null) { break; }
-    // 
-    //   List<AimValue> directions = antsDirections.get(antLoc);
-    //   if (directions == null) {
-    //     directions = squares.getDirectionsFor(antLoc);
-    //     antsDirections.put(antLoc, directions);
-    //   }
-    //   // logFiner(antLoc + " " + directions);
-    //   
-    //   for (Iterator<AimValue> it =  directions.iterator(); it.hasNext(); ) {
-    //     AimValue aimValue = it.next();
-    //     it.remove();
-    // 
-    //     if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
-    //       // logFiner(" -> " + aimValue.aim);
-    //       break;
-    //     }
-    //   }
-    //   
-    //   // to -> from
-    //   if (!tmpOrders.containsValue(antLoc)) { // haven't moved antLoc
-    //     while (antLoc != null) {
-    //       orders.put(antLoc, antLoc);
-    //       antLoc = tmpOrders.put(antLoc, antLoc); // move antLoc onto itself .. is there another ant?
-    //     }
-    //   }
-    // }
-    
-    orders = tmpOrders;
-  }
+  // public void moveAnts() {
+  //   Map<Tile,Tile> tmpOrders = new HashMap<Tile,Tile>(orders);
+  //   Map<Tile, List<AimValue>> antsDirections = new HashMap<Tile, List<AimValue>>();
+  //   Set<Tile> kamikazeAnts = new HashSet<Tile>();
+  // 
+  //   for (Tile antLoc : ants.getMyHills()) {
+  //     if (!ants.getMyAnts().contains(antLoc)) { continue; }
+  //     
+  //     if (((ants.getMyAnts().size() - attackAnts.size()) > maxExploreAnts) || (ants.getMyAnts().size() / 2 > attackAnts.size())) {
+  //       attackAnts.add(antLoc);
+  //     }
+  //   }
+  //         
+  //   moveFoodAnts(tmpOrders);
+  //   
+  //   for (Tile antLoc : ants.getMyAnts()) {
+  //     if (tmpOrders.containsValue(antLoc)) { continue; }
+  //     
+  //     // For ants close to my hills be more aggressive about attacking enemy ants (even if it means dying) to prevent
+  //     // a lucky enemy ant from killing my hive.
+  //     for (Tile myHill: ants.getMyHills()) {
+  //       if (ants.getDistance(myHill, antLoc) <= ants.getViewRadius2()) {
+  //         kamikazeAnts.add(antLoc);
+  //         break;
+  //       }
+  //     }
+  //     
+  //     List<AimValue> directions = squares.getDirectionsFor(antLoc);
+  //     // logFiner(antLoc + " " + directions + (attackAnts.contains(antLoc) ? " attack" : "") + (kamikazeAnts.contains(antLoc) ? " kamikaze" : ""));
+  // 
+  //     while (directions.size() > 0) {
+  //       if (directions.size() > 1 && directions.get(0).aim == null) {
+  //         directions.add(directions.remove(0));
+  //         logFiner(antLoc + " replacing null with " + aimValue.aim);
+  //       }
+  //       
+  //       AimValue aimValue = directions.remove(0);
+  //       if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+  //         combat.move(antLoc, 0, aimValue.aim);
+  //         // logFiner(" -> " + aimValue.aim);
+  //         break;
+  //       }
+  //     }
+  // 
+  //     // to -> from
+  //     if (!tmpOrders.containsValue(antLoc)) { // haven't moved antLoc
+  //       while (antLoc != null) {
+  //         antLoc = tmpOrders.put(antLoc, antLoc); // move antLoc onto itself .. is there another ant?
+  //       }
+  //     }
+  //   }
+  // 
+  //   // Prevent ants from dying.
+  //   // while (tmpOrders.size() > 0) {
+  //   //   Tile antLoc = null;
+  //   // 
+  //   //   Map<Tile,Integer> tmpAnts = new HashMap<Tile,Integer>(ants.getAnts());
+  //   //   for (Map.Entry<Tile,Tile> entry: tmpOrders.entrySet()) {
+  //   //     tmpAnts.remove(entry.getValue());
+  //   //     tmpAnts.put(entry.getKey(), 0);
+  //   //   }
+  //   //   CombatValues combatValues = new CombatValues(tmpAnts);
+  //   //   for (Iterator<Map.Entry<Tile,Tile>> it = tmpOrders.entrySet().iterator(); it.hasNext(); ) {
+  //   //     Map.Entry<Tile,Tile> tmpOrder = it.next();
+  //   //     Tile newLoc = tmpOrder.getKey();
+  //   //     Tile oldLoc = tmpOrder.getValue();
+  //   // 
+  //   //     if (orders.containsValue(oldLoc)) { continue; } // skip real orders
+  //   //     
+  //   //     boolean newWillDie = combat.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc));
+  //   //     boolean oldWillDie = combatValues.willDie(newLoc, 0, kamikazeAnts.contains(oldLoc));
+  //   //     if (newWillDie != oldWillDie) {
+  //   //       logFiner(newLoc + " will die old: " + oldWillDie + " new: " + newWillDie);
+  //   //     }
+  //   //     
+  //   //     if (newWillDie) {
+  //   //       antLoc = oldLoc;
+  //   //       it.remove();
+  //   //       // logFiner(oldLoc + " ->  " + newLoc + " will die");
+  //   //       break;
+  //   //     }
+  //   //   }
+  //   // 
+  //   //   if (antLoc == null) { break; }
+  //   // 
+  //   //   List<AimValue> directions = antsDirections.get(antLoc);
+  //   //   if (directions == null) {
+  //   //     directions = squares.getDirectionsFor(antLoc);
+  //   //     antsDirections.put(antLoc, directions);
+  //   //   }
+  //   //   // logFiner(antLoc + " " + directions);
+  //   //   
+  //   //   for (Iterator<AimValue> it =  directions.iterator(); it.hasNext(); ) {
+  //   //     AimValue aimValue = it.next();
+  //   //     it.remove();
+  //   // 
+  //   //     if (moveDirection(antLoc, aimValue.aim, tmpOrders)) {
+  //   //       // logFiner(" -> " + aimValue.aim);
+  //   //       break;
+  //   //     }
+  //   //   }
+  //   //   
+  //   //   // to -> from
+  //   //   if (!tmpOrders.containsValue(antLoc)) { // haven't moved antLoc
+  //   //     while (antLoc != null) {
+  //   //       orders.put(antLoc, antLoc);
+  //   //       antLoc = tmpOrders.put(antLoc, antLoc); // move antLoc onto itself .. is there another ant?
+  //   //     }
+  //   //   }
+  //   // }
+  //   
+  //   orders = tmpOrders;
+  // }
 
   public void issueOrders() {
     Set<Tile> newAttackAnts = new HashSet<Tile>();
