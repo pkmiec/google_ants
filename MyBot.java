@@ -1230,7 +1230,7 @@ public class MyBot extends Bot {
   }
 
   public void moveChargeAnts() {
-    logFinest("stillAnts: " + stillAnts);
+    // logFinest("stillAnts: " + stillAnts);
     
     Collection<AimAttackers> aimsAttackers = new PriorityQueue<AimAttackers>(11, Collections.reverseOrder());
     
